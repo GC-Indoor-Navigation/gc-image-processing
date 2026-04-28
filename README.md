@@ -5,6 +5,12 @@ Standalone FastAPI Processing Server for `gc-image-stream`.
 The primary frame input is the Stream Server gRPC relay. FastAPI is used for
 operational APIs such as health and buffer status.
 
+Relay contract:
+
+```text
+proto/processing_relay.proto
+```
+
 ## Quick Start
 
 ```powershell
