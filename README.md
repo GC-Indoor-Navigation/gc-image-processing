@@ -3,13 +3,42 @@
 Standalone FastAPI Processing Server for `gc-image-stream`.
 
 The primary frame input is the Stream Server gRPC relay. FastAPI is used for
-operational APIs such as health and buffer status.
+operational and debug APIs, not as the frame-processing trigger.
 
 Relay contract:
 
 ```text
 proto/processing_relay.proto
 ```
+
+## Runtime Flow
+
+```text
+Stream Server gRPC relay
+  -> GrpcRelayReceiver
+  -> ProcessingService
+  -> FrameBufferManager
+  -> SyncMatcher
+  -> ProcessingQueue
+  -> MotionCaptureWorker
+```
+
+## Project Layout
+
+```text
+app/
+  api/
+  buffers/
+  core/
+  infrastructure/
+  models/
+  pipeline/
+  schemas/
+  services/
+  sync/
+```
+
+See `docs/architecture.md` for module responsibilities.
 
 ## Quick Start
 
@@ -29,27 +58,6 @@ STREAM_RELAY_TARGET=127.0.0.1:50051
 STREAM_RELAY_TIMEOUT_SEC=
 ```
 
-## APIs
-
-- `GET /health`
-- `GET /status`: gRPC receiver state and buffer state
-- `GET /cameras`
-- `GET /cameras/{device_id}`
-- `GET /cameras/{device_id}/latest`
-- `GET /cameras/{device_id}/latest/image`
-- `GET /pipeline/status`
-
-## Debug Dump
-
-Frame files are not written to disk by default. Enable debug dumps only when
-you need local image files for inspection:
-
-```env
-PROCESSING_DEBUG_DUMP_ENABLED=true
-PROCESSING_DEBUG_DUMP_DIR=debug_frames
-PROCESSING_DEBUG_DUMP_MAX_PER_CAMERA=20
-```
-
 ## Sync Pipeline
 
 Initial sync is optional. It matches frames by `timestamp_ms`, enqueues matched
@@ -66,6 +74,27 @@ frame sets, and lets a placeholder worker consume them.
   --expected-camera camera2 `
   --expected-camera camera3 `
   --expected-camera camera4
+```
+
+## APIs
+
+- `GET /health`
+- `GET /status`
+- `GET /cameras`
+- `GET /cameras/{device_id}`
+- `GET /cameras/{device_id}/latest`
+- `GET /cameras/{device_id}/latest/image`
+- `GET /pipeline/status`
+
+## Debug Dump
+
+Frame files are not written to disk by default. Enable debug dumps only when
+you need local image files for inspection:
+
+```env
+PROCESSING_DEBUG_DUMP_ENABLED=true
+PROCESSING_DEBUG_DUMP_DIR=debug_frames
+PROCESSING_DEBUG_DUMP_MAX_PER_CAMERA=20
 ```
 
 ## ASGI
