@@ -36,6 +36,22 @@ class CameraBuffer:
             return None
         return self.frames[-1]
 
+    def nearest_frame(
+        self,
+        anchor_timestamp_ms: int,
+        window_ms: int,
+    ) -> StoredFrame | None:
+        nearest: StoredFrame | None = None
+        nearest_delta: int | None = None
+        for frame in self.frames:
+            delta = abs(frame.timestamp_ms - anchor_timestamp_ms)
+            if delta <= window_ms and (
+                nearest_delta is None or delta < nearest_delta
+            ):
+                nearest = frame
+                nearest_delta = delta
+        return nearest
+
 
 class FrameBufferManager:
     def __init__(self, buffer_size: int = 120):
@@ -84,6 +100,18 @@ class FrameBufferManager:
             if buffer is None:
                 return None
             return buffer.latest_frame()
+
+    def nearest_frame(
+        self,
+        device_id: str,
+        anchor_timestamp_ms: int,
+        window_ms: int,
+    ) -> StoredFrame | None:
+        with self._lock:
+            buffer = self._buffers.get(device_id)
+            if buffer is None:
+                return None
+            return buffer.nearest_frame(anchor_timestamp_ms, window_ms)
 
     def snapshot(self) -> dict:
         with self._lock:

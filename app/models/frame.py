@@ -31,3 +31,10 @@ class CameraStatus:
     last_sequence: int | None
     last_timestamp_ms: int | None
 
+
+@dataclass(frozen=True)
+class SynchronizedFrameSet:
+    frame_set_id: int
+    anchor_timestamp_ms: int
+    max_delta_ms: int
+    frames: dict[str, StoredFrame]

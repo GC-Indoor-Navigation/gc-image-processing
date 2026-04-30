@@ -1,0 +1,79 @@
+from time import sleep
+
+from app.buffers.frame_buffer import FrameBufferManager
+from app.infrastructure.relay_contract import RelayFrame
+from app.models.frame import SynchronizedFrameSet
+from app.pipeline.queue import ProcessingQueue
+from app.pipeline.worker import MotionCaptureWorker
+from app.services.processing import ProcessingService
+from app.sync.matcher import SyncMatcher
+
+
+def test_processing_queue_tracks_enqueue_and_dequeue():
+    queue = ProcessingQueue()
+    frame_set = SynchronizedFrameSet(
+        frame_set_id=1,
+        anchor_timestamp_ms=1000,
+        max_delta_ms=0,
+        frames={},
+    )
+
+    queue.enqueue(frame_set)
+    dequeued = queue.get(timeout=0.01)
+
+    assert dequeued == frame_set
+    assert queue.status() == {
+        "queue_size": 0,
+        "enqueued_count": 1,
+        "dequeued_count": 1,
+    }
+
+
+def test_motion_capture_worker_processes_queued_frame_set():
+    queue = ProcessingQueue()
+    worker = MotionCaptureWorker(processing_queue=queue)
+    frame_set = SynchronizedFrameSet(
+        frame_set_id=1,
+        anchor_timestamp_ms=1000,
+        max_delta_ms=0,
+        frames={},
+    )
+
+    worker.start()
+    try:
+        queue.enqueue(frame_set)
+        for _ in range(100):
+            if worker.status()["processed_count"] == 1:
+                break
+            sleep(0.01)
+        assert worker.status()["processed_count"] == 1
+        assert worker.status()["last_processed_frame_set_id"] == 1
+    finally:
+        worker.stop()
+
+
+def test_processing_service_enqueues_synchronized_frame_set():
+    buffer_manager = FrameBufferManager(buffer_size=120)
+    queue = ProcessingQueue()
+    matcher = SyncMatcher(
+        buffer_manager=buffer_manager,
+        expected_cameras=["camera1", "camera2"],
+        window_ms=30,
+    )
+    service = ProcessingService(
+        buffer_manager=buffer_manager,
+        sync_matcher=matcher,
+        processing_queue=queue,
+    )
+
+    service.handle_relay_frame(
+        RelayFrame("camera1", 1000, 1, "image/jpeg", b"frame-1")
+    )
+    service.handle_relay_frame(
+        RelayFrame("camera2", 1010, 1, "image/jpeg", b"frame-2")
+    )
+
+    assert queue.status()["enqueued_count"] == 1
+    frame_set = queue.get(timeout=0.01)
+    assert frame_set is not None
+    assert set(frame_set.frames) == {"camera1", "camera2"}

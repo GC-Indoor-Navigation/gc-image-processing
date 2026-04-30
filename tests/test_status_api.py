@@ -143,3 +143,15 @@ def test_latest_frame_endpoint_returns_404_for_missing_camera():
 
     assert response.status_code == 404
     assert response.json()["detail"] == "latest frame not found: missing"
+
+
+def test_pipeline_status_endpoint_returns_queue_and_worker_state():
+    client, _ = create_test_client()
+
+    response = client.get("/pipeline/status")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["sync"]["enabled"] is False
+    assert body["queue"]["queue_size"] == 0
+    assert body["worker"]["enabled"] is True

@@ -37,6 +37,7 @@ STREAM_RELAY_TIMEOUT_SEC=
 - `GET /cameras/{device_id}`
 - `GET /cameras/{device_id}/latest`
 - `GET /cameras/{device_id}/latest/image`
+- `GET /pipeline/status`
 
 ## Debug Dump
 
@@ -47,6 +48,24 @@ you need local image files for inspection:
 PROCESSING_DEBUG_DUMP_ENABLED=true
 PROCESSING_DEBUG_DUMP_DIR=debug_frames
 PROCESSING_DEBUG_DUMP_MAX_PER_CAMERA=20
+```
+
+## Sync Pipeline
+
+Initial sync is optional. It matches frames by `timestamp_ms`, enqueues matched
+frame sets, and lets a placeholder worker consume them.
+
+```powershell
+.\.venv\Scripts\python.exe main.py `
+  --host 127.0.0.1 `
+  --port 9000 `
+  --grpc-bind 127.0.0.1:50051 `
+  --sync-enabled `
+  --sync-window-ms 50 `
+  --expected-camera camera1 `
+  --expected-camera camera2 `
+  --expected-camera camera3 `
+  --expected-camera camera4
 ```
 
 ## ASGI
