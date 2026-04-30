@@ -4,11 +4,13 @@ from app.api.deps import (
     get_motion_capture_worker,
     get_processing_queue,
     get_settings,
+    get_sync_matcher,
 )
 from app.core.config import Settings
 from app.pipeline.queue import ProcessingQueue
 from app.pipeline.worker import MotionCaptureWorker
 from app.schemas.pipeline import PipelineStatusResponse
+from app.sync.matcher import SyncMatcher
 
 
 router = APIRouter(tags=["pipeline"])
@@ -19,7 +21,23 @@ def pipeline_status(
     settings: Settings = Depends(get_settings),
     processing_queue: ProcessingQueue | None = Depends(get_processing_queue),
     worker: MotionCaptureWorker | None = Depends(get_motion_capture_worker),
+    sync_matcher: SyncMatcher | None = Depends(get_sync_matcher),
 ):
+    sync_status = (
+        sync_matcher.status()
+        if sync_matcher is not None
+        else {
+            "matched_count": 0,
+            "missed_count": 0,
+            "duplicate_count": 0,
+            "ignored_count": 0,
+            "last_frame_set_id": None,
+            "last_anchor_timestamp_ms": None,
+            "last_max_delta_ms": None,
+            "last_missing_cameras": [],
+            "last_reason": None,
+        }
+    )
     queue_status = (
         processing_queue.status()
         if processing_queue is not None
@@ -42,6 +60,7 @@ def pipeline_status(
             "enabled": settings.sync_enabled,
             "expected_cameras": list(settings.expected_cameras),
             "window_ms": settings.sync_window_ms,
+            **sync_status,
         },
         "queue": queue_status,
         "worker": {

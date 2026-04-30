@@ -5,6 +5,7 @@ from app.infrastructure.grpc_receiver import GrpcRelayReceiver
 from app.pipeline.queue import ProcessingQueue
 from app.pipeline.worker import MotionCaptureWorker
 from app.services.processing import ProcessingService
+from app.sync.matcher import SyncMatcher
 
 
 def get_processing_service(request: Request) -> ProcessingService:
@@ -25,3 +26,7 @@ def get_processing_queue(request: Request) -> ProcessingQueue | None:
 
 def get_motion_capture_worker(request: Request) -> MotionCaptureWorker | None:
     return request.app.state.motion_capture_worker
+
+
+def get_sync_matcher(request: Request) -> SyncMatcher | None:
+    return request.app.state.sync_matcher

@@ -30,6 +30,9 @@ def test_sync_matcher_builds_frame_set_when_all_cameras_match():
     assert frame_set.anchor_timestamp_ms == 990
     assert frame_set.max_delta_ms == 20
     assert set(frame_set.frames) == {"camera1", "camera2", "camera3"}
+    assert matcher.status()["matched_count"] == 1
+    assert matcher.status()["last_frame_set_id"] == 1
+    assert matcher.status()["last_max_delta_ms"] == 20
 
 
 def test_sync_matcher_returns_none_until_all_cameras_are_present():
@@ -42,6 +45,10 @@ def test_sync_matcher_returns_none_until_all_cameras_are_present():
     anchor = buffer_manager.add_frame(make_frame("camera1", 1000, 1))
 
     assert matcher.try_match(anchor) is None
+    status = matcher.status()
+    assert status["missed_count"] == 1
+    assert status["last_missing_cameras"] == ["camera2"]
+    assert status["last_reason"] == "missing cameras inside sync window"
 
 
 def test_sync_matcher_deduplicates_same_frame_combination():
@@ -56,6 +63,8 @@ def test_sync_matcher_deduplicates_same_frame_combination():
 
     assert matcher.try_match(second) is not None
     assert matcher.try_match(first) is None
+    assert matcher.status()["duplicate_count"] == 1
+    assert matcher.status()["last_reason"] == "duplicate frame set"
 
 
 def test_sync_matcher_rejects_frames_outside_window():
@@ -69,4 +78,19 @@ def test_sync_matcher_rejects_frames_outside_window():
     anchor = buffer_manager.add_frame(make_frame("camera2", 1020, 1))
 
     assert matcher.try_match(anchor) is None
+    assert matcher.status()["missed_count"] == 1
+    assert matcher.status()["last_missing_cameras"] == ["camera1"]
 
+
+def test_sync_matcher_tracks_unexpected_camera_as_ignored():
+    buffer_manager = FrameBufferManager(buffer_size=120)
+    matcher = SyncMatcher(
+        buffer_manager=buffer_manager,
+        expected_cameras=["camera1", "camera2"],
+        window_ms=30,
+    )
+    anchor = buffer_manager.add_frame(make_frame("camera3", 1000, 1))
+
+    assert matcher.try_match(anchor) is None
+    assert matcher.status()["ignored_count"] == 1
+    assert matcher.status()["last_reason"] == "unexpected camera: camera3"

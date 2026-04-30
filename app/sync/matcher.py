@@ -14,14 +14,33 @@ class SyncMatcher:
         self.window_ms = window_ms
         self._next_frame_set_id = 1
         self._emitted_keys: set[tuple[tuple[str, int], ...]] = set()
+        self.matched_count = 0
+        self.missed_count = 0
+        self.duplicate_count = 0
+        self.ignored_count = 0
+        self.last_frame_set_id: int | None = None
+        self.last_anchor_timestamp_ms: int | None = None
+        self.last_max_delta_ms: int | None = None
+        self.last_missing_cameras: list[str] = []
+        self.last_reason: str | None = None
 
     def try_match(self, anchor_frame: StoredFrame) -> SynchronizedFrameSet | None:
         if not self.expected_cameras:
+            self._record_miss(
+                anchor_frame=anchor_frame,
+                reason="expected cameras are not configured",
+                missing_cameras=[],
+            )
             return None
         if anchor_frame.device_id not in self.expected_cameras:
+            self.ignored_count += 1
+            self.last_anchor_timestamp_ms = anchor_frame.timestamp_ms
+            self.last_missing_cameras = []
+            self.last_reason = f"unexpected camera: {anchor_frame.device_id}"
             return None
 
         selected: dict[str, StoredFrame] = {}
+        missing_cameras: list[str] = []
         for device_id in self.expected_cameras:
             frame = self.buffer_manager.nearest_frame(
                 device_id=device_id,
@@ -29,13 +48,25 @@ class SyncMatcher:
                 window_ms=self.window_ms,
             )
             if frame is None:
-                return None
+                missing_cameras.append(device_id)
+                continue
             selected[device_id] = frame
+        if missing_cameras:
+            self._record_miss(
+                anchor_frame=anchor_frame,
+                reason="missing cameras inside sync window",
+                missing_cameras=missing_cameras,
+            )
+            return None
 
         key = tuple(
             sorted((device_id, frame.sequence) for device_id, frame in selected.items())
         )
         if key in self._emitted_keys:
+            self.duplicate_count += 1
+            self.last_anchor_timestamp_ms = anchor_frame.timestamp_ms
+            self.last_missing_cameras = []
+            self.last_reason = "duplicate frame set"
             return None
         self._emitted_keys.add(key)
 
@@ -50,4 +81,34 @@ class SyncMatcher:
             frames=selected,
         )
         self._next_frame_set_id += 1
+        self.matched_count += 1
+        self.last_frame_set_id = frame_set.frame_set_id
+        self.last_anchor_timestamp_ms = anchor_frame.timestamp_ms
+        self.last_max_delta_ms = max_delta_ms
+        self.last_missing_cameras = []
+        self.last_reason = "matched"
         return frame_set
+
+    def status(self):
+        return {
+            "matched_count": self.matched_count,
+            "missed_count": self.missed_count,
+            "duplicate_count": self.duplicate_count,
+            "ignored_count": self.ignored_count,
+            "last_frame_set_id": self.last_frame_set_id,
+            "last_anchor_timestamp_ms": self.last_anchor_timestamp_ms,
+            "last_max_delta_ms": self.last_max_delta_ms,
+            "last_missing_cameras": self.last_missing_cameras,
+            "last_reason": self.last_reason,
+        }
+
+    def _record_miss(
+        self,
+        anchor_frame: StoredFrame,
+        reason: str,
+        missing_cameras: list[str],
+    ):
+        self.missed_count += 1
+        self.last_anchor_timestamp_ms = anchor_frame.timestamp_ms
+        self.last_missing_cameras = missing_cameras
+        self.last_reason = reason

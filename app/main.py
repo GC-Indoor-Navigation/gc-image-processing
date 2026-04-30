@@ -84,6 +84,7 @@ def create_app(
     fastapi_app.state.grpc_receiver = grpc_receiver
     fastapi_app.state.processing_queue = processing_queue
     fastapi_app.state.motion_capture_worker = motion_capture_worker
+    fastapi_app.state.sync_matcher = sync_matcher
     fastapi_app.include_router(health_router)
     fastapi_app.include_router(status_router)
     fastapi_app.include_router(pipeline_router)

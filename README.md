@@ -86,6 +86,9 @@ frame sets, and lets a placeholder worker consume them.
 - `GET /cameras/{device_id}/latest/image`
 - `GET /pipeline/status`
 
+`/pipeline/status` includes sync matcher counters, queue counters, and worker
+state.
+
 ## Debug Dump
 
 Frame files are not written to disk by default. Enable debug dumps only when

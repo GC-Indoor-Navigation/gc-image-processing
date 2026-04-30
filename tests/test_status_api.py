@@ -153,5 +153,7 @@ def test_pipeline_status_endpoint_returns_queue_and_worker_state():
     assert response.status_code == 200
     body = response.json()
     assert body["sync"]["enabled"] is False
+    assert body["sync"]["matched_count"] == 0
+    assert body["sync"]["last_missing_cameras"] == []
     assert body["queue"]["queue_size"] == 0
     assert body["worker"]["enabled"] is True
