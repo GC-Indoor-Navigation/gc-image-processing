@@ -159,6 +159,7 @@ def test_pipeline_status_endpoint_returns_queue_and_worker_state():
     assert body["sync"]["last_missing_cameras"] == []
     assert body["queue"]["queue_size"] == 0
     assert body["worker"]["enabled"] is True
+    assert body["worker"]["last_result"] is None
 
 
 def test_recent_frame_sets_endpoint_returns_metadata_without_bytes():

@@ -88,7 +88,8 @@ frame sets, and lets a placeholder worker consume them.
 - `GET /pipeline/recent-frame-sets`
 
 `/pipeline/status` includes sync matcher counters, queue counters, and worker
-state.
+state. The worker currently records a `placeholder_processed` result when it
+consumes a synchronized frame set.
 
 ## Debug Dump
 

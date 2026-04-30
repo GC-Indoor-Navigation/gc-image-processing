@@ -56,6 +56,7 @@ def pipeline_status(
             "error_count": 0,
             "last_processed_frame_set_id": None,
             "last_processed_at": None,
+            "last_result": None,
             "last_error": None,
         }
     )

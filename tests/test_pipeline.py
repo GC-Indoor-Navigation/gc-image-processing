@@ -48,6 +48,9 @@ def test_motion_capture_worker_processes_queued_frame_set():
             sleep(0.01)
         assert worker.status()["processed_count"] == 1
         assert worker.status()["last_processed_frame_set_id"] == 1
+        assert worker.status()["last_result"]["frame_set_id"] == 1
+        assert worker.status()["last_result"]["status"] == "placeholder_processed"
+        assert worker.status()["last_result"]["camera_count"] == 0
     finally:
         worker.stop()
 

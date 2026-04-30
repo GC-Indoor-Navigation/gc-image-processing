@@ -1,4 +1,5 @@
 import logging
+from dataclasses import asdict, dataclass
 from threading import Event, Thread
 from time import time
 
@@ -6,6 +7,16 @@ from app.pipeline.queue import ProcessingQueue
 
 
 LOGGER = logging.getLogger("app.pipeline.worker")
+
+
+@dataclass(frozen=True)
+class PlaceholderProcessingResult:
+    frame_set_id: int
+    status: str
+    camera_count: int
+    started_at: float
+    finished_at: float
+    elapsed_ms: float
 
 
 class MotionCaptureWorker:
@@ -17,6 +28,7 @@ class MotionCaptureWorker:
         self.error_count = 0
         self.last_processed_frame_set_id: int | None = None
         self.last_processed_at: float | None = None
+        self.last_result: PlaceholderProcessingResult | None = None
         self.last_error: str | None = None
 
     def start(self):
@@ -42,6 +54,11 @@ class MotionCaptureWorker:
             "error_count": self.error_count,
             "last_processed_frame_set_id": self.last_processed_frame_set_id,
             "last_processed_at": self.last_processed_at,
+            "last_result": (
+                asdict(self.last_result)
+                if self.last_result is not None
+                else None
+            ),
             "last_error": self.last_error,
         }
 
@@ -52,12 +69,23 @@ class MotionCaptureWorker:
                 continue
             try:
                 # Placeholder for the motion capture algorithm.
+                started_at = time()
+                finished_at = time()
+                result = PlaceholderProcessingResult(
+                    frame_set_id=frame_set.frame_set_id,
+                    status="placeholder_processed",
+                    camera_count=len(frame_set.frames),
+                    started_at=started_at,
+                    finished_at=finished_at,
+                    elapsed_ms=(finished_at - started_at) * 1000,
+                )
                 self.processed_count += 1
                 self.last_processed_frame_set_id = frame_set.frame_set_id
-                self.last_processed_at = time()
+                self.last_processed_at = finished_at
+                self.last_result = result
                 self.last_error = None
                 LOGGER.info(
-                    "processed frame_set_id=%s cameras=%s",
+                    "placeholder processed frame_set_id=%s cameras=%s",
                     frame_set.frame_set_id,
                     sorted(frame_set.frames),
                 )

@@ -22,6 +22,15 @@ class QueueStatusResponse(BaseModel):
     dequeued_count: int
 
 
+class PlaceholderProcessingResultResponse(BaseModel):
+    frame_set_id: int
+    status: str
+    camera_count: int
+    started_at: float
+    finished_at: float
+    elapsed_ms: float
+
+
 class WorkerStatusResponse(BaseModel):
     enabled: bool
     running: bool
@@ -29,6 +38,7 @@ class WorkerStatusResponse(BaseModel):
     error_count: int
     last_processed_frame_set_id: int | None
     last_processed_at: float | None
+    last_result: PlaceholderProcessingResultResponse | None
     last_error: str | None
 
 
