@@ -2,6 +2,12 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_ENV_PATH = PROJECT_ROOT / ".env"
+
 
 @dataclass(frozen=True)
 class Settings:
@@ -20,6 +26,7 @@ class Settings:
 
 
 def load_settings() -> Settings:
+    load_dotenv(DEFAULT_ENV_PATH)
     return Settings(
         http_host=os.getenv("PROCESSING_HTTP_HOST", "127.0.0.1"),
         http_port=int(os.getenv("PROCESSING_HTTP_PORT", "9000")),

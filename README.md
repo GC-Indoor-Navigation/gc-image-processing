@@ -38,12 +38,40 @@ app/
   sync/
 ```
 
-See `docs/architecture.md` for module responsibilities.
+## Environment
+
+The server automatically loads `.env` from the project root.
+
+Start from `.env.example`:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Key settings:
+
+```env
+PROCESSING_HTTP_HOST=127.0.0.1
+PROCESSING_HTTP_PORT=9000
+PROCESSING_GRPC_BIND=127.0.0.1:50051
+PROCESSING_GRPC_ENABLED=true
+PROCESSING_BUFFER_SIZE=120
+PROCESSING_SYNC_ENABLED=true
+PROCESSING_SYNC_WINDOW_MS=50
+PROCESSING_EXPECTED_CAMERAS=camera1,camera2,camera3,camera4
+PROCESSING_WORKER_ENABLED=true
+```
 
 ## Quick Start
 
 ```powershell
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe main.py
+```
+
+CLI flags can still override runtime settings:
+
+```powershell
 .\.venv\Scripts\python.exe main.py `
   --host 127.0.0.1 `
   --port 9000 `
@@ -60,20 +88,15 @@ STREAM_RELAY_TIMEOUT_SEC=
 
 ## Sync Pipeline
 
-Initial sync is optional. It matches frames by `timestamp_ms`, enqueues matched
-frame sets, and lets a placeholder worker consume them.
+Initial sync matches frames by `timestamp_ms`, enqueues matched frame sets, and
+lets a placeholder worker consume them.
 
-```powershell
-.\.venv\Scripts\python.exe main.py `
-  --host 127.0.0.1 `
-  --port 9000 `
-  --grpc-bind 127.0.0.1:50051 `
-  --sync-enabled `
-  --sync-window-ms 50 `
-  --expected-camera camera1 `
-  --expected-camera camera2 `
-  --expected-camera camera3 `
-  --expected-camera camera4
+Example `.env`:
+
+```env
+PROCESSING_SYNC_ENABLED=true
+PROCESSING_SYNC_WINDOW_MS=50
+PROCESSING_EXPECTED_CAMERAS=camera1,camera2,camera3,camera4
 ```
 
 ## APIs
