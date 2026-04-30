@@ -36,3 +36,19 @@ class PipelineStatusResponse(BaseModel):
     sync: SyncStatusResponse
     queue: QueueStatusResponse
     worker: WorkerStatusResponse
+
+
+class FrameSetFrameResponse(BaseModel):
+    device_id: str
+    timestamp_ms: int
+    sequence: int
+    content_type: str
+    image_size: int
+    source_file_path: str | None
+
+
+class FrameSetResponse(BaseModel):
+    frame_set_id: int
+    anchor_timestamp_ms: int
+    max_delta_ms: int
+    frames: dict[str, FrameSetFrameResponse]

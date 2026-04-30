@@ -4,7 +4,9 @@ from app.buffers.frame_buffer import FrameBufferManager
 from app.core.config import Settings
 from app.infrastructure.relay_contract import RelayFrame
 from app.main import create_app
+from app.pipeline.queue import ProcessingQueue
 from app.services.processing import ProcessingService
+from app.sync.matcher import SyncMatcher
 
 
 def create_test_client():
@@ -157,3 +159,44 @@ def test_pipeline_status_endpoint_returns_queue_and_worker_state():
     assert body["sync"]["last_missing_cameras"] == []
     assert body["queue"]["queue_size"] == 0
     assert body["worker"]["enabled"] is True
+
+
+def test_recent_frame_sets_endpoint_returns_metadata_without_bytes():
+    buffer_manager = FrameBufferManager(buffer_size=120)
+    queue = ProcessingQueue()
+    matcher = SyncMatcher(
+        buffer_manager=buffer_manager,
+        expected_cameras=["camera1", "camera2"],
+        window_ms=30,
+    )
+    service = ProcessingService(
+        buffer_manager=buffer_manager,
+        sync_matcher=matcher,
+        processing_queue=queue,
+    )
+    app = create_app(
+        settings=Settings(
+            grpc_enabled=False,
+            sync_enabled=True,
+            expected_cameras=("camera1", "camera2"),
+        ),
+        service=service,
+    )
+    app.state.sync_matcher = matcher
+    client = TestClient(app)
+
+    service.handle_relay_frame(
+        RelayFrame("camera1", 1000, 1, "image/jpeg", b"frame-1")
+    )
+    service.handle_relay_frame(
+        RelayFrame("camera2", 1010, 1, "image/jpeg", b"frame-2")
+    )
+
+    response = client.get("/pipeline/recent-frame-sets")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body[0]["frame_set_id"] == 1
+    assert set(body[0]["frames"]) == {"camera1", "camera2"}
+    assert body[0]["frames"]["camera1"]["image_size"] == 7
+    assert "image_bytes" not in body[0]["frames"]["camera1"]

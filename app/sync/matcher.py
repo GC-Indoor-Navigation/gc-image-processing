@@ -1,3 +1,5 @@
+from collections import deque
+
 from app.buffers.frame_buffer import FrameBufferManager
 from app.models.frame import StoredFrame, SynchronizedFrameSet
 
@@ -8,12 +10,17 @@ class SyncMatcher:
         buffer_manager: FrameBufferManager,
         expected_cameras: list[str],
         window_ms: int,
+        recent_limit: int = 20,
     ):
         self.buffer_manager = buffer_manager
         self.expected_cameras = list(expected_cameras)
         self.window_ms = window_ms
+        self.recent_limit = recent_limit
         self._next_frame_set_id = 1
         self._emitted_keys: set[tuple[tuple[str, int], ...]] = set()
+        self._recent_frame_sets: deque[SynchronizedFrameSet] = deque(
+            maxlen=recent_limit
+        )
         self.matched_count = 0
         self.missed_count = 0
         self.duplicate_count = 0
@@ -87,6 +94,7 @@ class SyncMatcher:
         self.last_max_delta_ms = max_delta_ms
         self.last_missing_cameras = []
         self.last_reason = "matched"
+        self._recent_frame_sets.append(frame_set)
         return frame_set
 
     def status(self):
@@ -101,6 +109,9 @@ class SyncMatcher:
             "last_missing_cameras": self.last_missing_cameras,
             "last_reason": self.last_reason,
         }
+
+    def recent_frame_sets(self) -> list[SynchronizedFrameSet]:
+        return list(self._recent_frame_sets)
 
     def _record_miss(
         self,

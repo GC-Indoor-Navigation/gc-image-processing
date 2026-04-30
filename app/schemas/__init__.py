@@ -5,7 +5,7 @@ from app.schemas.status import (
     GrpcStatusResponse,
     ProcessingStatusResponse,
 )
-from app.schemas.pipeline import PipelineStatusResponse
+from app.schemas.pipeline import FrameSetResponse, PipelineStatusResponse
 
 
 __all__ = [
@@ -13,6 +13,7 @@ __all__ = [
     "CameraStatusResponse",
     "FrameMetadataResponse",
     "GrpcStatusResponse",
+    "FrameSetResponse",
     "PipelineStatusResponse",
     "ProcessingStatusResponse",
 ]

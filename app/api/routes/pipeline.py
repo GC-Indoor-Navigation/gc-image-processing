@@ -9,11 +9,25 @@ from app.api.deps import (
 from app.core.config import Settings
 from app.pipeline.queue import ProcessingQueue
 from app.pipeline.worker import MotionCaptureWorker
-from app.schemas.pipeline import PipelineStatusResponse
+from app.schemas.pipeline import FrameSetResponse, PipelineStatusResponse
 from app.sync.matcher import SyncMatcher
 
 
 router = APIRouter(tags=["pipeline"])
+
+
+def _empty_sync_status():
+    return {
+        "matched_count": 0,
+        "missed_count": 0,
+        "duplicate_count": 0,
+        "ignored_count": 0,
+        "last_frame_set_id": None,
+        "last_anchor_timestamp_ms": None,
+        "last_max_delta_ms": None,
+        "last_missing_cameras": [],
+        "last_reason": None,
+    }
 
 
 @router.get("/pipeline/status", response_model=PipelineStatusResponse)
@@ -26,17 +40,7 @@ def pipeline_status(
     sync_status = (
         sync_matcher.status()
         if sync_matcher is not None
-        else {
-            "matched_count": 0,
-            "missed_count": 0,
-            "duplicate_count": 0,
-            "ignored_count": 0,
-            "last_frame_set_id": None,
-            "last_anchor_timestamp_ms": None,
-            "last_max_delta_ms": None,
-            "last_missing_cameras": [],
-            "last_reason": None,
-        }
+        else _empty_sync_status()
     )
     queue_status = (
         processing_queue.status()
@@ -68,3 +72,30 @@ def pipeline_status(
             **worker_status,
         },
     }
+
+
+@router.get("/pipeline/recent-frame-sets", response_model=list[FrameSetResponse])
+def recent_frame_sets(
+    sync_matcher: SyncMatcher | None = Depends(get_sync_matcher),
+):
+    if sync_matcher is None:
+        return []
+    return [
+        {
+            "frame_set_id": frame_set.frame_set_id,
+            "anchor_timestamp_ms": frame_set.anchor_timestamp_ms,
+            "max_delta_ms": frame_set.max_delta_ms,
+            "frames": {
+                device_id: {
+                    "device_id": frame.device_id,
+                    "timestamp_ms": frame.timestamp_ms,
+                    "sequence": frame.sequence,
+                    "content_type": frame.content_type,
+                    "image_size": frame.image_size,
+                    "source_file_path": frame.source_file_path,
+                }
+                for device_id, frame in frame_set.frames.items()
+            },
+        }
+        for frame_set in sync_matcher.recent_frame_sets()
+    ]

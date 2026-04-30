@@ -33,6 +33,7 @@ def test_sync_matcher_builds_frame_set_when_all_cameras_match():
     assert matcher.status()["matched_count"] == 1
     assert matcher.status()["last_frame_set_id"] == 1
     assert matcher.status()["last_max_delta_ms"] == 20
+    assert matcher.recent_frame_sets() == [frame_set]
 
 
 def test_sync_matcher_returns_none_until_all_cameras_are_present():
@@ -94,3 +95,24 @@ def test_sync_matcher_tracks_unexpected_camera_as_ignored():
     assert matcher.try_match(anchor) is None
     assert matcher.status()["ignored_count"] == 1
     assert matcher.status()["last_reason"] == "unexpected camera: camera3"
+
+
+def test_sync_matcher_keeps_recent_frame_sets_with_limit():
+    buffer_manager = FrameBufferManager(buffer_size=120)
+    matcher = SyncMatcher(
+        buffer_manager=buffer_manager,
+        expected_cameras=["camera1"],
+        window_ms=30,
+        recent_limit=2,
+    )
+
+    first = buffer_manager.add_frame(make_frame("camera1", 1000, 1))
+    second = buffer_manager.add_frame(make_frame("camera1", 1010, 2))
+    third = buffer_manager.add_frame(make_frame("camera1", 1020, 3))
+    matcher.try_match(first)
+    matcher.try_match(second)
+    matcher.try_match(third)
+
+    assert [
+        frame_set.frame_set_id for frame_set in matcher.recent_frame_sets()
+    ] == [2, 3]
