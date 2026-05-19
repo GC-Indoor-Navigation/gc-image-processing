@@ -157,6 +157,8 @@ def test_pipeline_status_endpoint_returns_queue_and_worker_state():
     assert body["sync"]["enabled"] is False
     assert body["sync"]["matched_count"] == 0
     assert body["sync"]["last_missing_cameras"] == []
+    assert body["relay_frame_sets"]["accepted_count"] == 0
+    assert body["relay_frame_sets"]["duplicate_count"] == 0
     assert body["queue"]["queue_size"] == 0
     assert body["worker"]["enabled"] is True
     assert body["worker"]["last_result"] is None

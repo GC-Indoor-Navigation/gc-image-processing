@@ -5,7 +5,11 @@ from app.schemas.status import (
     GrpcStatusResponse,
     ProcessingStatusResponse,
 )
-from app.schemas.pipeline import FrameSetResponse, PipelineStatusResponse
+from app.schemas.pipeline import (
+    FrameSetResponse,
+    PipelineStatusResponse,
+    RelayFrameSetStatusResponse,
+)
 
 
 __all__ = [
@@ -15,5 +19,6 @@ __all__ = [
     "GrpcStatusResponse",
     "FrameSetResponse",
     "PipelineStatusResponse",
+    "RelayFrameSetStatusResponse",
     "ProcessingStatusResponse",
 ]

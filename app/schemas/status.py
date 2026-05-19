@@ -17,6 +17,7 @@ class FrameMetadataResponse(BaseModel):
     content_type: str
     image_size: int
     source_file_path: str | None
+    source_frame_id: int | None = None
 
 
 class GrpcStatusResponse(BaseModel):

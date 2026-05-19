@@ -20,6 +20,7 @@ class StoredFrame:
     image_bytes: bytes
     image_size: int
     source_file_path: str | None
+    source_frame_id: int | None = None
 
 
 @dataclass(frozen=True)

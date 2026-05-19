@@ -56,6 +56,7 @@ def create_app(
         GrpcRelayReceiver(
             bind=app_settings.grpc_bind,
             frame_handler=processing_service.handle_relay_frame,
+            frame_set_handler=processing_service.handle_relay_frame_set,
         )
         if app_settings.grpc_enabled
         else None

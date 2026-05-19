@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends
 from app.api.deps import (
     get_motion_capture_worker,
     get_processing_queue,
+    get_processing_service,
     get_settings,
     get_sync_matcher,
 )
@@ -10,6 +11,7 @@ from app.core.config import Settings
 from app.pipeline.queue import ProcessingQueue
 from app.pipeline.worker import MotionCaptureWorker
 from app.schemas.pipeline import FrameSetResponse, PipelineStatusResponse
+from app.services.processing import ProcessingService
 from app.sync.matcher import SyncMatcher
 
 
@@ -33,6 +35,7 @@ def _empty_sync_status():
 @router.get("/pipeline/status", response_model=PipelineStatusResponse)
 def pipeline_status(
     settings: Settings = Depends(get_settings),
+    service: ProcessingService = Depends(get_processing_service),
     processing_queue: ProcessingQueue | None = Depends(get_processing_queue),
     worker: MotionCaptureWorker | None = Depends(get_motion_capture_worker),
     sync_matcher: SyncMatcher | None = Depends(get_sync_matcher),
@@ -67,6 +70,7 @@ def pipeline_status(
             "window_ms": settings.sync_window_ms,
             **sync_status,
         },
+        "relay_frame_sets": service.relay_frame_set_status(),
         "queue": queue_status,
         "worker": {
             "enabled": settings.worker_enabled,
@@ -94,6 +98,7 @@ def recent_frame_sets(
                     "content_type": frame.content_type,
                     "image_size": frame.image_size,
                     "source_file_path": frame.source_file_path,
+                    "source_frame_id": frame.source_frame_id,
                 }
                 for device_id, frame in frame_set.frames.items()
             },

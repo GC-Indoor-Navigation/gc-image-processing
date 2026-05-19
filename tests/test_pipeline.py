@@ -1,7 +1,11 @@
 from time import sleep
 
 from app.buffers.frame_buffer import FrameBufferManager
-from app.infrastructure.relay_contract import RelayFrame
+from app.infrastructure.relay_contract import (
+    RelayFrame,
+    RelayFrameSet,
+    RelayFrameSetFrame,
+)
 from app.models.frame import SynchronizedFrameSet
 from app.pipeline.queue import ProcessingQueue
 from app.pipeline.worker import MotionCaptureWorker
@@ -80,3 +84,63 @@ def test_processing_service_enqueues_synchronized_frame_set():
     frame_set = queue.get(timeout=0.01)
     assert frame_set is not None
     assert set(frame_set.frames) == {"camera1", "camera2"}
+
+
+def test_processing_service_enqueues_relay_frame_set_without_sync_matcher():
+    queue = ProcessingQueue()
+    service = ProcessingService(
+        buffer_manager=FrameBufferManager(buffer_size=120),
+        processing_queue=queue,
+    )
+
+    result = service.handle_relay_frame_set(
+        RelayFrameSet(
+            frame_set_id=10,
+            anchor_timestamp_ms=1000,
+            max_delta_ms=10,
+            frames=(
+                RelayFrameSetFrame(
+                    "camera1",
+                    1000,
+                    1,
+                    "image/jpeg",
+                    b"frame-1",
+                    frame_id=101,
+                ),
+                RelayFrameSetFrame("camera2", 1010, 1, "image/jpeg", b"frame-2"),
+            ),
+        )
+    )
+
+    assert result is not None
+    assert queue.status()["enqueued_count"] == 1
+    queued = queue.get(timeout=0.01)
+    assert queued is not None
+    assert queued.frame_set_id == 10
+    assert set(queued.frames) == {"camera1", "camera2"}
+    assert queued.frames["camera1"].source_frame_id == 101
+    assert service.relay_frame_set_status() == {
+        "accepted_count": 1,
+        "duplicate_count": 0,
+        "last_frame_set_id": 10,
+    }
+
+
+def test_processing_service_ignores_duplicate_relay_frame_set_id():
+    queue = ProcessingQueue()
+    service = ProcessingService(
+        buffer_manager=FrameBufferManager(buffer_size=120),
+        processing_queue=queue,
+    )
+    frame_set = RelayFrameSet(
+        frame_set_id=10,
+        anchor_timestamp_ms=1000,
+        max_delta_ms=10,
+        frames=(RelayFrameSetFrame("camera1", 1000, 1, "image/jpeg", b"frame"),),
+    )
+
+    assert service.handle_relay_frame_set(frame_set) is not None
+    assert service.handle_relay_frame_set(frame_set) is None
+
+    assert queue.status()["enqueued_count"] == 1
+    assert service.relay_frame_set_status()["duplicate_count"] == 1

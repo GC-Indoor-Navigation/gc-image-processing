@@ -22,6 +22,12 @@ class QueueStatusResponse(BaseModel):
     dequeued_count: int
 
 
+class RelayFrameSetStatusResponse(BaseModel):
+    accepted_count: int
+    duplicate_count: int
+    last_frame_set_id: int | None
+
+
 class PlaceholderProcessingResultResponse(BaseModel):
     frame_set_id: int
     status: str
@@ -44,6 +50,7 @@ class WorkerStatusResponse(BaseModel):
 
 class PipelineStatusResponse(BaseModel):
     sync: SyncStatusResponse
+    relay_frame_sets: RelayFrameSetStatusResponse
     queue: QueueStatusResponse
     worker: WorkerStatusResponse
 
@@ -55,6 +62,7 @@ class FrameSetFrameResponse(BaseModel):
     content_type: str
     image_size: int
     source_file_path: str | None
+    source_frame_id: int | None = None
 
 
 class FrameSetResponse(BaseModel):

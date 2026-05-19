@@ -11,6 +11,12 @@ Relay contract:
 proto/processing_relay.proto
 ```
 
+The receiver supports both raw frame relay and pre-synchronized frame-set relay:
+
+- `StreamFrames`: raw camera frames, still handled by the local buffer/sync path.
+- `StreamFrameSets`: synchronized frame sets, converted directly into the
+  processing queue and deduplicated by `frame_set_id`.
+
 ## Runtime Flow
 
 ```text
@@ -111,8 +117,9 @@ PROCESSING_EXPECTED_CAMERAS=camera1,camera2,camera3,camera4
 - `GET /pipeline/recent-frame-sets`
 
 `/pipeline/status` includes sync matcher counters, queue counters, and worker
-state. The worker currently records a `placeholder_processed` result when it
-consumes a synchronized frame set.
+state. It also exposes relay frame-set accept/duplicate counters. The worker
+currently records a `placeholder_processed` result when it consumes a
+synchronized frame set.
 
 ## Debug Dump
 
