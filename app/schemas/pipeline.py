@@ -28,7 +28,7 @@ class RelayFrameSetStatusResponse(BaseModel):
     last_frame_set_id: int | None
 
 
-class PlaceholderProcessingResultResponse(BaseModel):
+class ProcessingResultResponse(BaseModel):
     frame_set_id: int
     status: str
     camera_count: int
@@ -44,7 +44,7 @@ class WorkerStatusResponse(BaseModel):
     error_count: int
     last_processed_frame_set_id: int | None
     last_processed_at: float | None
-    last_result: PlaceholderProcessingResultResponse | None
+    last_result: ProcessingResultResponse | None
     last_error: str | None
 
 

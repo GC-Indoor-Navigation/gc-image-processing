@@ -27,6 +27,7 @@ Stream Server gRPC relay
   -> SyncMatcher
   -> ProcessingQueue
   -> MotionCaptureWorker
+  -> MotionCaptureProcessor
 ```
 
 ## Project Layout
@@ -118,8 +119,8 @@ PROCESSING_EXPECTED_CAMERAS=camera1,camera2,camera3,camera4
 
 `/pipeline/status` includes sync matcher counters, queue counters, and worker
 state. It also exposes relay frame-set accept/duplicate counters. The worker
-currently records a `placeholder_processed` result when it consumes a
-synchronized frame set.
+currently delegates to a placeholder motion capture processor that records a
+`placeholder_processed` result when it consumes a synchronized frame set.
 
 ## Debug Dump
 
