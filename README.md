@@ -27,6 +27,7 @@ Stream Server gRPC relay
   -> SyncMatcher
   -> ProcessingQueue
   -> MotionCaptureWorker
+  -> MotionCaptureInputAdapter
   -> MotionCaptureProcessor
 ```
 
@@ -121,6 +122,29 @@ PROCESSING_EXPECTED_CAMERAS=camera1,camera2,camera3,camera4
 state. It also exposes relay frame-set accept/duplicate counters. The worker
 currently delegates to a placeholder motion capture processor that records a
 `placeholder_processed` result when it consumes a synchronized frame set.
+
+## Processor Input
+
+The worker converts synchronized frame sets into a processor-facing input DTO
+before calling the motion capture processor:
+
+```text
+MotionCaptureInput
+  frame_set_id
+  anchor_timestamp_ms
+  max_delta_ms
+  frames[device_id]
+    timestamp_ms
+    sequence
+    content_type
+    image_bytes
+    image_size
+    source_file_path
+    source_frame_id
+```
+
+Image bytes are kept encoded at this boundary. The concrete processing module
+can decode `image_bytes` into image arrays in its own adapter layer.
 
 ## Debug Dump
 

@@ -1,3 +1,8 @@
+from app.pipeline.input_adapter import (
+    CameraFrameInput,
+    MotionCaptureInput,
+    MotionCaptureInputAdapter,
+)
 from app.pipeline.processor import (
     MotionCaptureProcessor,
     PlaceholderMotionCaptureProcessor,
@@ -8,7 +13,10 @@ from app.pipeline.worker import MotionCaptureWorker
 
 
 __all__ = [
+    "CameraFrameInput",
     "MotionCaptureProcessor",
+    "MotionCaptureInput",
+    "MotionCaptureInputAdapter",
     "MotionCaptureWorker",
     "PlaceholderMotionCaptureProcessor",
     "ProcessingQueue",

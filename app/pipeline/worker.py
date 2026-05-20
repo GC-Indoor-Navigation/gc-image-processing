@@ -2,6 +2,7 @@ import logging
 from dataclasses import asdict
 from threading import Event, Thread
 
+from app.pipeline.input_adapter import MotionCaptureInputAdapter
 from app.pipeline.processor import (
     MotionCaptureProcessor,
     PlaceholderMotionCaptureProcessor,
@@ -18,9 +19,11 @@ class MotionCaptureWorker:
         self,
         processing_queue: ProcessingQueue,
         processor: MotionCaptureProcessor | None = None,
+        input_adapter: MotionCaptureInputAdapter | None = None,
     ):
         self.processing_queue = processing_queue
         self.processor = processor or PlaceholderMotionCaptureProcessor()
+        self.input_adapter = input_adapter or MotionCaptureInputAdapter()
         self._stop_event = Event()
         self._thread: Thread | None = None
         self.processed_count = 0
@@ -67,7 +70,8 @@ class MotionCaptureWorker:
             if frame_set is None:
                 continue
             try:
-                result = self.processor.process(frame_set)
+                processing_input = self.input_adapter.from_frame_set(frame_set)
+                result = self.processor.process(processing_input)
                 self.processed_count += 1
                 self.last_processed_frame_set_id = frame_set.frame_set_id
                 self.last_processed_at = result.finished_at

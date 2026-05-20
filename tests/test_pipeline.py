@@ -6,7 +6,8 @@ from app.infrastructure.relay_contract import (
     RelayFrameSet,
     RelayFrameSetFrame,
 )
-from app.models.frame import SynchronizedFrameSet
+from app.models.frame import StoredFrame, SynchronizedFrameSet
+from app.pipeline.input_adapter import MotionCaptureInputAdapter
 from app.pipeline.processor import ProcessingResult
 from app.pipeline.queue import ProcessingQueue
 from app.pipeline.worker import MotionCaptureWorker
@@ -65,12 +66,12 @@ def test_motion_capture_worker_delegates_to_processor():
         def __init__(self):
             self.received = []
 
-        def process(self, frame_set):
-            self.received.append(frame_set)
+        def process(self, processing_input):
+            self.received.append(processing_input)
             return ProcessingResult(
-                frame_set_id=frame_set.frame_set_id,
+                frame_set_id=processing_input.frame_set_id,
                 status="processed_by_test",
-                camera_count=len(frame_set.frames),
+                camera_count=len(processing_input.frames),
                 started_at=1.0,
                 finished_at=2.0,
                 elapsed_ms=1000.0,
@@ -93,11 +94,45 @@ def test_motion_capture_worker_delegates_to_processor():
             if worker.status()["processed_count"] == 1:
                 break
             sleep(0.01)
-        assert processor.received == [frame_set]
+        assert len(processor.received) == 1
+        assert processor.received[0].frame_set_id == frame_set.frame_set_id
         assert worker.status()["last_result"]["status"] == "processed_by_test"
         assert worker.status()["last_processed_at"] == 2.0
     finally:
         worker.stop()
+
+
+def test_motion_capture_input_adapter_preserves_frame_metadata():
+    adapter = MotionCaptureInputAdapter()
+    frame_set = SynchronizedFrameSet(
+        frame_set_id=3,
+        anchor_timestamp_ms=1000,
+        max_delta_ms=10,
+        frames={
+            "camera1": StoredFrame(
+                device_id="camera1",
+                timestamp_ms=1000,
+                sequence=7,
+                content_type="image/jpeg",
+                image_bytes=b"frame",
+                image_size=5,
+                source_file_path="storage/camera1/7.jpg",
+                source_frame_id=77,
+            )
+        },
+    )
+
+    processing_input = adapter.from_frame_set(frame_set)
+
+    assert processing_input.frame_set_id == 3
+    assert processing_input.anchor_timestamp_ms == 1000
+    assert processing_input.frames["camera1"].timestamp_ms == 1000
+    assert processing_input.frames["camera1"].image_bytes == b"frame"
+    assert (
+        processing_input.frames["camera1"].source_file_path
+        == "storage/camera1/7.jpg"
+    )
+    assert processing_input.frames["camera1"].source_frame_id == 77
 
 
 def test_processing_service_enqueues_synchronized_frame_set():
