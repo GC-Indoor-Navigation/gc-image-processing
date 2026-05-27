@@ -9,14 +9,14 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-CALIBRATION_ROOT = REPO_ROOT / "sync_by_camera1_nearest_common_range"
-SYNC_SCRIPT = CALIBRATION_ROOT / "sync_by_camera1_nearest_common_range.py"
-CASCALIB_SCRIPT = CALIBRATION_ROOT / "cascalib" / "run_cascalib_rotation_no_charuco.py"
-CASCALIB_REPO = CALIBRATION_ROOT / "cascalib" / "CasCalib"
+CALIBRATION_ROOT = REPO_ROOT / "tools" / "calibration"
+SYNC_SCRIPT = CALIBRATION_ROOT / "sync_frames" / "sync_by_camera1_nearest_common_range.py"
+CASCALIB_SCRIPT = CALIBRATION_ROOT / "cascalib_runner" / "run_cascalib_rotation_no_charuco.py"
+CASCALIB_REPO = CALIBRATION_ROOT / "vendor" / "CasCalib"
 
 
 class PipelineError(RuntimeError):

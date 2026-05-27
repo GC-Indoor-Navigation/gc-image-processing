@@ -18,7 +18,6 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY tools ./tools
-COPY sync_by_camera1_nearest_common_range ./sync_by_camera1_nearest_common_range
 
 ENTRYPOINT ["python", "/workspace/tools/calibration/run_pipeline.py"]
 
