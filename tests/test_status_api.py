@@ -154,6 +154,9 @@ def test_pipeline_status_endpoint_returns_queue_and_worker_state():
 
     assert response.status_code == 200
     body = response.json()
+    assert body["relay_path"]["primary_method"] == "StreamFrameSets"
+    assert body["relay_path"]["raw_stream_frames_mode"] == "legacy_fallback"
+    assert body["relay_path"]["raw_sync_enabled"] is False
     assert body["sync"]["enabled"] is False
     assert body["sync"]["matched_count"] == 0
     assert body["sync"]["last_missing_cameras"] == []

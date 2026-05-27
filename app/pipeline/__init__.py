@@ -3,6 +3,11 @@ from app.pipeline.input_adapter import (
     MotionCaptureInput,
     MotionCaptureInputAdapter,
 )
+from app.pipeline.external_processor import (
+    ExternalMotionCaptureProcessor,
+    ExternalProcessorOutput,
+    ExternalProcessorRunner,
+)
 from app.pipeline.processor import (
     MotionCaptureProcessor,
     PlaceholderMotionCaptureProcessor,
@@ -14,6 +19,9 @@ from app.pipeline.worker import MotionCaptureWorker
 
 __all__ = [
     "CameraFrameInput",
+    "ExternalMotionCaptureProcessor",
+    "ExternalProcessorOutput",
+    "ExternalProcessorRunner",
     "MotionCaptureProcessor",
     "MotionCaptureInput",
     "MotionCaptureInputAdapter",

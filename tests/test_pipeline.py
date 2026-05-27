@@ -7,8 +7,9 @@ from app.infrastructure.relay_contract import (
     RelayFrameSetFrame,
 )
 from app.models.frame import StoredFrame, SynchronizedFrameSet
+from app.pipeline.external_processor import ExternalMotionCaptureProcessor
 from app.pipeline.input_adapter import MotionCaptureInputAdapter
-from app.pipeline.processor import ProcessingResult
+from app.pipeline.processor import PlaceholderMotionCaptureProcessor, ProcessingResult
 from app.pipeline.queue import ProcessingQueue
 from app.pipeline.worker import MotionCaptureWorker
 from app.services.processing import ProcessingService
@@ -133,6 +134,50 @@ def test_motion_capture_input_adapter_preserves_frame_metadata():
         == "storage/camera1/7.jpg"
     )
     assert processing_input.frames["camera1"].source_frame_id == 77
+
+
+def test_external_motion_capture_processor_wraps_runner():
+    received = []
+
+    def runner(processing_input):
+        received.append(processing_input)
+        return {"status": "external_ok"}
+
+    processor = ExternalMotionCaptureProcessor(runner=runner)
+    processing_input = MotionCaptureInputAdapter().from_frame_set(
+        SynchronizedFrameSet(
+            frame_set_id=4,
+            anchor_timestamp_ms=1000,
+            max_delta_ms=10,
+            frames={},
+        )
+    )
+
+    result = processor.process(processing_input)
+
+    assert received == [processing_input]
+    assert result.frame_set_id == 4
+    assert result.status == "external_ok"
+    assert result.camera_count == 0
+    assert result.elapsed_ms >= 0
+
+
+def test_placeholder_motion_capture_processor_uses_input_metadata():
+    processor = PlaceholderMotionCaptureProcessor()
+    processing_input = MotionCaptureInputAdapter().from_frame_set(
+        SynchronizedFrameSet(
+            frame_set_id=5,
+            anchor_timestamp_ms=1000,
+            max_delta_ms=10,
+            frames={},
+        )
+    )
+
+    result = processor.process(processing_input)
+
+    assert result.frame_set_id == 5
+    assert result.status == "placeholder_processed"
+    assert result.camera_count == 0
 
 
 def test_processing_service_enqueues_synchronized_frame_set():

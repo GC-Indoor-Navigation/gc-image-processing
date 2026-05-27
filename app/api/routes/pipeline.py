@@ -64,6 +64,11 @@ def pipeline_status(
         }
     )
     return {
+        "relay_path": {
+            "primary_method": "StreamFrameSets",
+            "raw_stream_frames_mode": "legacy_fallback",
+            "raw_sync_enabled": settings.sync_enabled,
+        },
         "sync": {
             "enabled": settings.sync_enabled,
             "expected_cameras": list(settings.expected_cameras),

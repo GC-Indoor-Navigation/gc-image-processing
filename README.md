@@ -64,7 +64,7 @@ PROCESSING_HTTP_PORT=9000
 PROCESSING_GRPC_BIND=127.0.0.1:50051
 PROCESSING_GRPC_ENABLED=true
 PROCESSING_BUFFER_SIZE=120
-PROCESSING_SYNC_ENABLED=true
+PROCESSING_SYNC_ENABLED=false
 PROCESSING_SYNC_WINDOW_MS=50
 PROCESSING_EXPECTED_CAMERAS=camera1,camera2,camera3,camera4
 PROCESSING_WORKER_ENABLED=true
@@ -94,15 +94,34 @@ STREAM_RELAY_TARGET=127.0.0.1:50051
 STREAM_RELAY_TIMEOUT_SEC=
 ```
 
-## Sync Pipeline
+## Relay Paths
 
-Initial sync matches frames by `timestamp_ms`, enqueues matched frame sets, and
-lets a placeholder worker consume them.
+The primary path is synchronized frame-set relay:
+
+```text
+StreamFrameSets
+  -> RelayFrameSet
+  -> SynchronizedFrameSet
+  -> ProcessingQueue
+  -> MotionCaptureInput
+  -> MotionCaptureProcessor
+```
+
+Raw frame relay is retained only as a legacy/debug fallback:
+
+```text
+StreamFrames
+  -> FrameBufferManager
+  -> SyncMatcher
+  -> ProcessingQueue
+```
+
+Keep local sync disabled for the normal Stream Server integrated path:
 
 Example `.env`:
 
 ```env
-PROCESSING_SYNC_ENABLED=true
+PROCESSING_SYNC_ENABLED=false
 PROCESSING_SYNC_WINDOW_MS=50
 PROCESSING_EXPECTED_CAMERAS=camera1,camera2,camera3,camera4
 ```
@@ -118,10 +137,11 @@ PROCESSING_EXPECTED_CAMERAS=camera1,camera2,camera3,camera4
 - `GET /pipeline/status`
 - `GET /pipeline/recent-frame-sets`
 
-`/pipeline/status` includes sync matcher counters, queue counters, and worker
-state. It also exposes relay frame-set accept/duplicate counters. The worker
-currently delegates to a placeholder motion capture processor that records a
-`placeholder_processed` result when it consumes a synchronized frame set.
+`/pipeline/status` includes the primary relay method, raw fallback mode, sync
+matcher counters, queue counters, relay frame-set accept/duplicate counters,
+and worker state. The worker currently delegates to a placeholder motion
+capture processor that records a `placeholder_processed` result when it
+consumes a synchronized frame set.
 
 ## Processor Input
 
@@ -145,6 +165,24 @@ MotionCaptureInput
 
 Image bytes are kept encoded at this boundary. The concrete processing module
 can decode `image_bytes` into image arrays in its own adapter layer.
+
+An external processor can be connected by wrapping a callable that accepts
+`MotionCaptureInput`:
+
+```python
+from app.pipeline.external_processor import ExternalMotionCaptureProcessor
+from app.pipeline.worker import MotionCaptureWorker
+
+
+def run_motion_capture(processing_input):
+    camera1 = processing_input.frames["camera1"]
+    # Decode camera1.image_bytes and call the actual algorithm here.
+    return {"status": "motion_capture_processed"}
+
+
+processor = ExternalMotionCaptureProcessor(runner=run_motion_capture)
+worker = MotionCaptureWorker(processing_queue=queue, processor=processor)
+```
 
 ## Debug Dump
 

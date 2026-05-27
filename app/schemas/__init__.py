@@ -10,6 +10,7 @@ from app.schemas.pipeline import (
     PipelineStatusResponse,
     ProcessingResultResponse,
     RelayFrameSetStatusResponse,
+    RelayPathStatusResponse,
 )
 
 
@@ -22,5 +23,6 @@ __all__ = [
     "PipelineStatusResponse",
     "ProcessingResultResponse",
     "RelayFrameSetStatusResponse",
+    "RelayPathStatusResponse",
     "ProcessingStatusResponse",
 ]

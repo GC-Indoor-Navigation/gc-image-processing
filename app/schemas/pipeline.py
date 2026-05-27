@@ -28,6 +28,12 @@ class RelayFrameSetStatusResponse(BaseModel):
     last_frame_set_id: int | None
 
 
+class RelayPathStatusResponse(BaseModel):
+    primary_method: str
+    raw_stream_frames_mode: str
+    raw_sync_enabled: bool
+
+
 class ProcessingResultResponse(BaseModel):
     frame_set_id: int
     status: str
@@ -49,6 +55,7 @@ class WorkerStatusResponse(BaseModel):
 
 
 class PipelineStatusResponse(BaseModel):
+    relay_path: RelayPathStatusResponse
     sync: SyncStatusResponse
     relay_frame_sets: RelayFrameSetStatusResponse
     queue: QueueStatusResponse
