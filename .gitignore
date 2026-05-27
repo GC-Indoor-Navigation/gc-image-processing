@@ -7,3 +7,25 @@ debug_frames/
 .env
 WORKLOG.md
 docs/
+
+# Offline calibration job data and generated artifacts
+calibration_jobs/
+calibration_runs/
+data/
+outputs/
+
+**/timesync_10fps_no_charuco/
+**/synced_10fps_camera1_ref/
+**/mmpose_json/
+**/mmpose_vis/
+**/sync_frame_matches/
+**/all_[0-9]*/
+**/prepared_*/
+**/cascalib_results*/
+
+*.npz
+*.pickle
+*.html
+*_pose.jpg
+*_pose.jpeg
+*_pose.png
