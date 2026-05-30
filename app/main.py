@@ -13,6 +13,7 @@ from app.core.config import Settings, load_settings
 from app.infrastructure.debug_dump import DebugFrameDumper
 from app.infrastructure.grpc_receiver import GrpcRelayReceiver
 from app.pipeline.queue import ProcessingQueue
+from app.pipeline.processor import MotionCaptureProcessor
 from app.pipeline.worker import MotionCaptureWorker
 from app.services.processing import ProcessingService
 from app.sync.matcher import SyncMatcher
@@ -37,8 +38,12 @@ def create_app(
         if app_settings.sync_enabled
         else None
     )
+    motion_capture_processor = build_motion_capture_processor(app_settings)
     motion_capture_worker = (
-        MotionCaptureWorker(processing_queue=processing_queue)
+        MotionCaptureWorker(
+            processing_queue=processing_queue,
+            processor=motion_capture_processor,
+        )
         if app_settings.worker_enabled
         else None
     )
@@ -92,6 +97,44 @@ def create_app(
     return fastapi_app
 
 
+def build_motion_capture_processor(settings: Settings) -> MotionCaptureProcessor | None:
+    processor = settings.processor.strip().lower()
+    if processor in {"", "placeholder"}:
+        return None
+    if processor in {"mmpose_triangulation", "mmpose-triangulation"}:
+        from app.pipeline.mmpose_triangulation import (
+            MMPoseTriangulationConfig,
+            MMPoseTriangulationProcessor,
+            parse_camera_mapping,
+        )
+
+        if settings.mmpose_calib_json is None:
+            raise ValueError(
+                "PROCESSING_MMPOSE_CALIB_JSON is required for mmpose_triangulation"
+            )
+        if not settings.mmpose_camera_mapping:
+            raise ValueError(
+                "PROCESSING_MMPOSE_CAMERA_MAPPING is required for "
+                "mmpose_triangulation"
+            )
+
+        return MMPoseTriangulationProcessor(
+            MMPoseTriangulationConfig(
+                calib_json=settings.mmpose_calib_json,
+                camera_mapping=parse_camera_mapping(settings.mmpose_camera_mapping),
+                pose2d=settings.mmpose_pose2d,
+                device=settings.mmpose_device,
+                kpt_thr=settings.mmpose_kpt_thr,
+                max_reproj_error=settings.mmpose_max_reproj_error,
+                images_undistorted=settings.mmpose_images_undistorted,
+                extrinsic_source=settings.mmpose_extrinsic_source,
+                extrinsic_convention=settings.mmpose_extrinsic_convention,
+                temp_dir=settings.mmpose_temp_dir,
+            )
+        )
+    raise ValueError(f"unknown processing processor: {settings.processor}")
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description="GC image processing FastAPI server")
     parser.add_argument("--host", default="127.0.0.1")
@@ -106,6 +149,17 @@ def parse_args():
     parser.add_argument("--sync-window-ms", type=int, default=50)
     parser.add_argument("--expected-camera", action="append", default=[])
     parser.add_argument("--disable-worker", action="store_true")
+    parser.add_argument("--processor", default="placeholder")
+    parser.add_argument("--mmpose-calib-json", default=None)
+    parser.add_argument("--mmpose-camera-mapping", action="append", default=[])
+    parser.add_argument("--mmpose-pose2d", default="human")
+    parser.add_argument("--mmpose-device", default="cuda:0")
+    parser.add_argument("--mmpose-kpt-thr", type=float, default=0.30)
+    parser.add_argument("--mmpose-max-reproj-error", type=float, default=40.0)
+    parser.add_argument("--mmpose-images-undistorted", action="store_true")
+    parser.add_argument("--mmpose-extrinsic-source", default="auto")
+    parser.add_argument("--mmpose-extrinsic-convention", default="world_to_camera")
+    parser.add_argument("--mmpose-temp-dir", default=None)
     return parser.parse_args()
 
 
@@ -133,6 +187,19 @@ def main():
         sync_window_ms=args.sync_window_ms,
         expected_cameras=tuple(args.expected_camera),
         worker_enabled=not args.disable_worker,
+        processor=args.processor,
+        mmpose_calib_json=(
+            Path(args.mmpose_calib_json) if args.mmpose_calib_json else None
+        ),
+        mmpose_camera_mapping=tuple(args.mmpose_camera_mapping),
+        mmpose_pose2d=args.mmpose_pose2d,
+        mmpose_device=args.mmpose_device,
+        mmpose_kpt_thr=args.mmpose_kpt_thr,
+        mmpose_max_reproj_error=args.mmpose_max_reproj_error,
+        mmpose_images_undistorted=args.mmpose_images_undistorted,
+        mmpose_extrinsic_source=args.mmpose_extrinsic_source,
+        mmpose_extrinsic_convention=args.mmpose_extrinsic_convention,
+        mmpose_temp_dir=Path(args.mmpose_temp_dir) if args.mmpose_temp_dir else None,
     )
     server_app = create_app(settings=settings)
     LOGGER.info(
