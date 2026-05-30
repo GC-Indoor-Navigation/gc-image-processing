@@ -11,8 +11,11 @@ docs/
 # Offline calibration job data and generated artifacts
 calibration_jobs/
 calibration_runs/
+mmpose_smoke_runs/
 data/
 outputs/
+docker/images/*.tar
+docker/images/*.tar.gz
 
 **/timesync_10fps_no_charuco/
 **/synced_10fps_camera1_ref/
