@@ -3,6 +3,8 @@
 __pycache__
 .pytest_cache
 debug_frames
+docker/images
+last_capstone
 
 .env
 WORKLOG.md
