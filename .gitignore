@@ -4,6 +4,7 @@ __pycache__/
 *.py[cod]
 debug_frames/
 last_capstone/
+runtime/
 
 .env
 WORKLOG.md

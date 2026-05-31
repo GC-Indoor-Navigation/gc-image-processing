@@ -6,7 +6,7 @@ param(
     [string[]]$CameraFrame,
 
     [string]$Image = "gc-mmpose-processing:smoke",
-    [string]$OutJson = "mmpose_smoke_runs\latest\result.json",
+    [string]$OutJson = "runtime\outputs\smoke\result.json",
     [string]$Pose2d = "human",
     [string]$Device = "cuda:0",
     [double]$KptThr = 0.30,

@@ -5,7 +5,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string[]]$CameraFrame,
 
-    [string]$OutJson = "mmpose_smoke_runs\latest\result.json",
+    [string]$OutJson = "runtime\outputs\smoke\result.json",
     [string]$Python = "",
     [string]$Pose2d = "human",
     [string]$Device = "cuda:0",
