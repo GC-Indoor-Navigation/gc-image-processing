@@ -52,7 +52,8 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     MPLBACKEND=Agg \
     CUDA_HOME=/usr/local/cuda \
-    FORCE_CUDA=1
+    FORCE_CUDA=1 \
+    LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/local/nvidia/lib:/usr/local/nvidia/lib64
 
 ARG MAX_JOBS=1
 ARG TORCH_CUDA_ARCH_LIST=8.6
@@ -74,11 +75,90 @@ WORKDIR /workspace/gc-image-processing
 COPY docker/calibration/requirements-calibration.txt /tmp/requirements-calibration.txt
 RUN python -m pip install -r /tmp/requirements-calibration.txt
 
+RUN python -m pip uninstall -y \
+        opencv-python \
+        opencv-python-headless \
+        opencv-contrib-python \
+        opencv-contrib-python-headless || true \
+    && python -m pip install "opencv-contrib-python-headless==4.8.1.78"
+
+RUN python -m pip install --no-build-isolation "chumpy==0.70"
+
+RUN python - <<'PY'
+from pathlib import Path
+import site
+
+site_packages = Path(site.getsitepackages()[0])
+p = site_packages / "sitecustomize.py"
+
+patch = """
+# Compatibility patch for chumpy==0.70 with numpy>=1.24
+try:
+    import numpy as _np
+    _np.bool = bool
+    _np.int = int
+    _np.float = float
+    _np.complex = complex
+    _np.object = object
+    _np.str = str
+    _np.unicode = str
+except Exception:
+    pass
+"""
+
+old = p.read_text(encoding="utf-8") if p.exists() else ""
+if "Compatibility patch for chumpy==0.70" not in old:
+    p.write_text(old + "\n" + patch + "\n", encoding="utf-8")
+
+print("patched:", p)
+PY
+
+RUN python - <<'PY'
+from pathlib import Path
+import site
+
+targets = []
+for sp in site.getsitepackages():
+    p = Path(sp) / "chumpy" / "__init__.py"
+    if p.exists():
+        targets.append(p)
+
+if not targets:
+    raise SystemExit("chumpy __init__.py not found")
+
+p = targets[0]
+txt = p.read_text(encoding="utf-8")
+
+old = "from numpy import bool, int, float, complex, object, unicode, str, nan, inf"
+new = """import numpy as _np
+import builtins as _builtins
+bool = _builtins.bool
+int = _builtins.int
+float = _builtins.float
+complex = _builtins.complex
+object = _builtins.object
+unicode = _builtins.str
+str = _builtins.str
+nan = _np.nan
+inf = _np.inf"""
+
+if old in txt:
+    txt = txt.replace(old, new, 1)
+    p.write_text(txt, encoding="utf-8")
+    print("patched chumpy:", p)
+elif "import builtins as _builtins" in txt:
+    print("chumpy already patched:", p)
+else:
+    print("target:", p)
+    raise SystemExit("expected chumpy numpy import line not found")
+PY
+
 # CasCalib README asks for pytorch3d from facebookresearch/pytorch3d@stable.
 # Use a pinned ref by default for repeatable Docker builds; override this build
 # arg only when the torch/CUDA combination has changed.
 ARG PYTORCH3D_REF=75ebeeaea0908c5527e7b1e305fbc7681382db47
-RUN python -m pip install "git+https://github.com/facebookresearch/pytorch3d.git@${PYTORCH3D_REF}"
+RUN python -m pip install "iopath==0.1.10" "fvcore==0.1.5.post20221221" \
+    && python -m pip install --no-build-isolation "git+https://github.com/facebookresearch/pytorch3d.git@${PYTORCH3D_REF}"
 
 COPY tools ./tools
 
@@ -87,6 +167,7 @@ import sys
 from pathlib import Path
 
 import cv2
+import chumpy
 import mmpose
 import numpy
 import pytorch3d
@@ -105,6 +186,7 @@ print("calibration full import check ok")
 print("torch", torch.__version__, "cuda", torch.version.cuda)
 print("mmpose", mmpose.__version__)
 print("pytorch3d", getattr(pytorch3d, "__version__", "unknown"))
+print("chumpy ok")
 print("cv2", cv2.__version__)
 print("numpy", numpy.__version__)
 PY
