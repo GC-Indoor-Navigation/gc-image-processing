@@ -4,6 +4,7 @@ from app.buffers.frame_buffer import FrameBufferManager
 from app.core.config import Settings
 from app.infrastructure.relay_contract import RelayFrame
 from app.main import create_app
+from app.pipeline.processor import ProcessingResult
 from app.pipeline.queue import ProcessingQueue
 from app.services.processing import ProcessingService
 from app.sync.matcher import SyncMatcher
@@ -165,6 +166,70 @@ def test_pipeline_status_endpoint_returns_queue_and_worker_state():
     assert body["queue"]["queue_size"] == 0
     assert body["worker"]["enabled"] is True
     assert body["worker"]["last_result"] is None
+
+
+def test_latest_pipeline_result_endpoint_returns_empty_state():
+    client, _ = create_test_client()
+
+    response = client.get("/pipeline/results/latest")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["available"] is False
+    assert body["processor"] == "PlaceholderMotionCaptureProcessor"
+    assert body["processing_result"] is None
+    assert body["result"] is None
+    assert body["last_error"] is None
+
+
+def test_latest_pipeline_result_endpoint_returns_triangulation_result():
+    client, _ = create_test_client()
+    worker = client.app.state.motion_capture_worker
+    worker.last_result = ProcessingResult(
+        frame_set_id=10,
+        status="mmpose_triangulated",
+        camera_count=3,
+        started_at=1.0,
+        finished_at=2.0,
+        elapsed_ms=1000.0,
+    )
+    worker.processor.last_skeleton_result = {
+        "frame_set_id": 10,
+        "anchor_timestamp_ms": 1000,
+        "max_delta_ms": 8,
+        "num_valid_joints": 17,
+        "avg_reproj_error_px": 2.5,
+        "joints_world": {
+            "nose": {
+                "xyz": [1.0, 2.0, 3.0],
+                "score": 0.9,
+                "reproj_error_px": 1.5,
+                "reproj_error_by_camera_px": {"Camera1": 1.0},
+                "used_cameras": ["Camera1", "Camera2"],
+            }
+        },
+        "joints_camera": {"Camera1": {"nose": [0.1, 0.2, 0.3]}},
+        "camera_centers_world": {"Camera1": [0.0, 0.0, 0.0]},
+        "source_frames": {
+            "Camera1": {
+                "device_id": "camera1",
+                "timestamp_ms": 1000,
+                "sequence": 1,
+                "source_file_path": None,
+                "source_frame_id": 101,
+            }
+        },
+    }
+
+    response = client.get("/pipeline/results/latest")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["available"] is True
+    assert body["processing_result"]["status"] == "mmpose_triangulated"
+    assert body["result"]["frame_set_id"] == 10
+    assert body["result"]["num_valid_joints"] == 17
+    assert body["result"]["joints_world"]["nose"]["xyz"] == [1.0, 2.0, 3.0]
 
 
 def test_recent_frame_sets_endpoint_returns_metadata_without_bytes():

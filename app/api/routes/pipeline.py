@@ -1,3 +1,6 @@
+from dataclasses import asdict, is_dataclass
+from typing import Any
+
 from fastapi import APIRouter, Depends
 
 from app.api.deps import (
@@ -10,7 +13,11 @@ from app.api.deps import (
 from app.core.config import Settings
 from app.pipeline.queue import ProcessingQueue
 from app.pipeline.worker import MotionCaptureWorker
-from app.schemas.pipeline import FrameSetResponse, PipelineStatusResponse
+from app.schemas.pipeline import (
+    FrameSetResponse,
+    LatestTriangulationResultResponse,
+    PipelineStatusResponse,
+)
 from app.services.processing import ProcessingService
 from app.sync.matcher import SyncMatcher
 
@@ -84,6 +91,38 @@ def pipeline_status(
     }
 
 
+@router.get(
+    "/pipeline/results/latest",
+    response_model=LatestTriangulationResultResponse,
+)
+def latest_triangulation_result(
+    worker: MotionCaptureWorker | None = Depends(get_motion_capture_worker),
+):
+    if worker is None:
+        return {
+            "available": False,
+            "processor": None,
+            "processing_result": None,
+            "result": None,
+            "last_error": None,
+        }
+
+    processor = worker.processor
+    skeleton_result = getattr(processor, "last_skeleton_result", None)
+    result = _serialize_result(skeleton_result)
+    return {
+        "available": result is not None,
+        "processor": processor.__class__.__name__,
+        "processing_result": (
+            asdict(worker.last_result)
+            if worker.last_result is not None
+            else None
+        ),
+        "result": result,
+        "last_error": worker.last_error,
+    }
+
+
 @router.get("/pipeline/recent-frame-sets", response_model=list[FrameSetResponse])
 def recent_frame_sets(
     sync_matcher: SyncMatcher | None = Depends(get_sync_matcher),
@@ -110,3 +149,13 @@ def recent_frame_sets(
         }
         for frame_set in sync_matcher.recent_frame_sets()
     ]
+
+
+def _serialize_result(value: Any) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    if is_dataclass(value):
+        return asdict(value)
+    if isinstance(value, dict):
+        return value
+    return None

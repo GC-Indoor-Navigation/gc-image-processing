@@ -1,3 +1,5 @@
+from typing import Any
+
 from pydantic import BaseModel
 
 
@@ -60,6 +62,14 @@ class PipelineStatusResponse(BaseModel):
     relay_frame_sets: RelayFrameSetStatusResponse
     queue: QueueStatusResponse
     worker: WorkerStatusResponse
+
+
+class LatestTriangulationResultResponse(BaseModel):
+    available: bool
+    processor: str | None
+    processing_result: ProcessingResultResponse | None
+    result: dict[str, Any] | None
+    last_error: str | None
 
 
 class FrameSetFrameResponse(BaseModel):

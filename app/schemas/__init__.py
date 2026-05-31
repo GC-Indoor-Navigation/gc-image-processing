@@ -7,6 +7,7 @@ from app.schemas.status import (
 )
 from app.schemas.pipeline import (
     FrameSetResponse,
+    LatestTriangulationResultResponse,
     PipelineStatusResponse,
     ProcessingResultResponse,
     RelayFrameSetStatusResponse,
@@ -20,6 +21,7 @@ __all__ = [
     "FrameMetadataResponse",
     "GrpcStatusResponse",
     "FrameSetResponse",
+    "LatestTriangulationResultResponse",
     "PipelineStatusResponse",
     "ProcessingResultResponse",
     "RelayFrameSetStatusResponse",
