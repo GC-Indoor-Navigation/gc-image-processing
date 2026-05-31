@@ -7,7 +7,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
+$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 $dockerfilePath = Resolve-Path (Join-Path $repoRoot $Dockerfile)
 
 $argsList = @(

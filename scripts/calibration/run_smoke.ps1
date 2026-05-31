@@ -11,7 +11,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
+$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 $jobsRootPath = Join-Path $repoRoot $JobsRoot
 $jobRoot = Join-Path $jobsRootPath $SessionId
 $inputDir = Join-Path $jobRoot "input"

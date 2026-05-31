@@ -10,7 +10,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
+$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 $runtimeRoot = Join-Path $repoRoot $RuntimeDir
 $calibrationDir = Join-Path $runtimeRoot "calibration"
 $framesDir = Join-Path $runtimeRoot "smoke_frames"

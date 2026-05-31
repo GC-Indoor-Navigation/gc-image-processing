@@ -22,7 +22,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
+$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 
 function Convert-ToContainerPath([string]$PathText) {
     $resolved = Resolve-Path -LiteralPath $PathText

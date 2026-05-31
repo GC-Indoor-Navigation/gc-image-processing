@@ -13,7 +13,7 @@ if ($FrameCount -lt 1) {
     throw "FrameCount must be >= 1"
 }
 
-$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
+$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 $jobRoot = Join-Path (Join-Path $repoRoot $JobsRoot) $SessionId
 $inputRoot = Join-Path $jobRoot "input"
 

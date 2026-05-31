@@ -5,7 +5,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
+$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 $dockerfile = Join-Path $repoRoot "docker\calibration\Dockerfile"
 
 if (-not (Test-Path -LiteralPath $dockerfile)) {

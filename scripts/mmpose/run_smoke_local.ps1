@@ -19,7 +19,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
+$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 $runner = Join-Path $repoRoot "tools\mmpose_triangulation\run_smoke.py"
 
 if (-not (Test-Path -LiteralPath $runner)) {

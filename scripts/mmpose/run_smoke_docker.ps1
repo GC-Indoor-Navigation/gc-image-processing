@@ -21,7 +21,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
+$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 $calibPath = Resolve-Path -LiteralPath $CalibJson
 
 function Convert-ToContainerPath([string]$PathText) {
