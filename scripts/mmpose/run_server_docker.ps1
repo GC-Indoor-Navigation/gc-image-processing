@@ -26,10 +26,15 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 
 function Convert-ToContainerPath([string]$PathText) {
     $resolved = Resolve-Path -LiteralPath $PathText
-    $relative = [System.IO.Path]::GetRelativePath($repoRoot.Path, $resolved.Path)
-    if ($relative.StartsWith("..")) {
+    $repoPath = $repoRoot.Path.TrimEnd("\", "/")
+    $resolvedPath = $resolved.Path
+    if (
+        -not $resolvedPath.Equals($repoPath, [System.StringComparison]::OrdinalIgnoreCase) -and
+        -not $resolvedPath.StartsWith("$repoPath\", [System.StringComparison]::OrdinalIgnoreCase)
+    ) {
         throw "Path must be inside the repository because only the repository is mounted: $($resolved.Path)"
     }
+    $relative = $resolvedPath.Substring($repoPath.Length).TrimStart("\", "/")
     return "/workspace/gc-image-processing/" + ($relative -replace "\\", "/")
 }
 
@@ -77,3 +82,6 @@ Write-Host "Device:  $effectiveDevice"
 Write-Host "Mapping: $($CameraMapping -join ',')"
 
 docker @dockerArgs
+if ($LASTEXITCODE -ne 0) {
+    exit $LASTEXITCODE
+}

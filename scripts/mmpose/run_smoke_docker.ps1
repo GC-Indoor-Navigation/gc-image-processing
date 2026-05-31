@@ -26,10 +26,15 @@ $calibPath = Resolve-Path -LiteralPath $CalibJson
 
 function Convert-ToContainerPath([string]$PathText) {
     $resolved = Resolve-Path -LiteralPath $PathText
-    $relative = [System.IO.Path]::GetRelativePath($repoRoot.Path, $resolved.Path)
-    if ($relative.StartsWith("..")) {
+    $repoPath = $repoRoot.Path.TrimEnd("\", "/")
+    $resolvedPath = $resolved.Path
+    if (
+        -not $resolvedPath.Equals($repoPath, [System.StringComparison]::OrdinalIgnoreCase) -and
+        -not $resolvedPath.StartsWith("$repoPath\", [System.StringComparison]::OrdinalIgnoreCase)
+    ) {
         throw "Path must be inside the repository because only the repository is mounted: $($resolved.Path)"
     }
+    $relative = $resolvedPath.Substring($repoPath.Length).TrimStart("\", "/")
     return "/workspace/gc-image-processing/" + ($relative -replace "\\", "/")
 }
 
@@ -69,14 +74,15 @@ $dockerArgs = @(
     "run",
     "--rm",
     "-v", "$($repoRoot.Path):/workspace/gc-image-processing",
-    "-w", "/workspace/gc-image-processing"
+    "-w", "/workspace/gc-image-processing",
+    "--entrypoint", "python"
 )
 
 if (-not $NoGpu -and -not $Cpu) {
     $dockerArgs += @("--gpus", "all")
 }
 
-$dockerArgs += @($Image, "python")
+$dockerArgs += $Image
 $dockerArgs += $runnerArgs
 
 Write-Host "Running MMPose Docker smoke"
@@ -86,3 +92,6 @@ Write-Host "OutJson:  $containerOut"
 Write-Host "Device:   $(if ($Cpu) { "cpu" } else { $Device })"
 
 docker @dockerArgs
+if ($LASTEXITCODE -ne 0) {
+    exit $LASTEXITCODE
+}

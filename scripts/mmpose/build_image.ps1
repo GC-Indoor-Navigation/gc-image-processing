@@ -30,3 +30,6 @@ Write-Host "Context:    $($repoRoot.Path)"
 Write-Host "BaseImage:  $BaseImage"
 
 docker @argsList
+if ($LASTEXITCODE -ne 0) {
+    exit $LASTEXITCODE
+}
