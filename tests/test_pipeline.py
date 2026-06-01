@@ -1,3 +1,4 @@
+import json
 from time import sleep
 
 from app.buffers.frame_buffer import FrameBufferManager
@@ -409,3 +410,68 @@ def test_jsonl_result_store_reads_history_and_summary(tmp_path):
     assert summary["runs"][0]["avg_reproj_error_px"] == 15.0
     assert summary["runs"][0]["min_reproj_error_px"] == 12.0
     assert summary["runs"][0]["max_reproj_error_px"] == 18.0
+
+
+def test_jsonl_result_store_summarizes_restart_files_separately(tmp_path):
+    store = JsonlTriangulationResultStore(tmp_path)
+
+    for _ in range(2):
+        store.save(
+            SynchronizedFrameSet(
+                frame_set_id=1,
+                anchor_timestamp_ms=1000,
+                max_delta_ms=10,
+                relay_run_id=1,
+                frames={},
+            ),
+            ProcessingResult(
+                frame_set_id=1,
+                status="mmpose_triangulated",
+                camera_count=3,
+                started_at=1.0,
+                finished_at=2.0,
+                elapsed_ms=1000.0,
+            ),
+            {
+                "frame_set_id": 1,
+                "anchor_timestamp_ms": 1000,
+                "max_delta_ms": 10,
+                "num_valid_joints": 17,
+                "avg_reproj_error_px": 12.0,
+                "joints_world": {},
+                "source_frames": {},
+            },
+        )
+
+    (tmp_path / "relay_run_0001_restart.jsonl").write_text(
+        json.dumps(
+            {
+                "written_at": 3.0,
+                "relay_run_id": 1,
+                "frame_set_id": 1,
+                "processing_result": {
+                    "frame_set_id": 1,
+                    "status": "mmpose_triangulated",
+                    "camera_count": 3,
+                    "started_at": 1.0,
+                    "finished_at": 2.0,
+                    "elapsed_ms": 1000.0,
+                },
+                "triangulation_summary": {
+                    "frame_set_id": 1,
+                    "anchor_timestamp_ms": 1000,
+                    "max_delta_ms": 10,
+                    "num_valid_joints": 17,
+                    "avg_reproj_error_px": 20.0,
+                    "joints_world": {},
+                    "source_frames": {},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    summary = store.summarize()
+
+    assert summary["run_count"] == 2
+    assert sorted(run["result_count"] for run in summary["runs"]) == [1, 2]

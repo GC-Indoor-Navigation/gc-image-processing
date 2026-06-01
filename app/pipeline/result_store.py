@@ -82,17 +82,12 @@ class JsonlTriangulationResultStore:
         return [_to_history_item(entry) for entry in entries[:limit]]
 
     def summarize(self) -> dict[str, Any]:
-        entries_by_run: dict[int, list[dict[str, Any]]] = {}
-        path_by_run: dict[int, Path] = {}
-        for path in self._result_paths():
-            for entry in _read_jsonl(path):
-                run_id = int(entry.get("relay_run_id") or 0)
-                entries_by_run.setdefault(run_id, []).append(entry)
-                path_by_run[run_id] = path
-
         runs = []
-        for run_id, entries in sorted(entries_by_run.items()):
-            runs.append(_summarize_run(run_id, path_by_run[run_id], entries))
+        for path in self._result_paths():
+            entries = _read_jsonl(path)
+            if not entries:
+                continue
+            runs.append(_summarize_result_file(path, entries))
 
         return {
             "enabled": True,
@@ -206,8 +201,7 @@ def _to_history_item(entry: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _summarize_run(
-    run_id: int,
+def _summarize_result_file(
     path: Path,
     entries: list[dict[str, Any]],
 ) -> dict[str, Any]:
@@ -216,10 +210,14 @@ def _summarize_run(
     elapsed_times = []
     status_counts: dict[str, int] = {}
     frame_set_ids = []
+    relay_run_ids = set()
 
     for entry in entries:
         processing_result = entry.get("processing_result") or {}
         summary = entry.get("triangulation_summary") or {}
+        relay_run_id = entry.get("relay_run_id")
+        if isinstance(relay_run_id, int):
+            relay_run_ids.add(relay_run_id)
         status = processing_result.get("status") or "unknown"
         status_counts[status] = status_counts.get(status, 0) + 1
         frame_set_id = entry.get("frame_set_id")
@@ -230,7 +228,7 @@ def _summarize_run(
         _append_number(elapsed_times, processing_result.get("elapsed_ms"))
 
     return {
-        "relay_run_id": run_id,
+        "relay_run_id": min(relay_run_ids) if relay_run_ids else 0,
         "path": str(path),
         "result_count": len(entries),
         "first_frame_set_id": min(frame_set_ids) if frame_set_ids else None,
