@@ -9,6 +9,7 @@ from app.pipeline.processor import (
     ProcessingResult,
 )
 from app.pipeline.queue import ProcessingQueue
+from app.pipeline.result_store import JsonlTriangulationResultStore
 
 
 LOGGER = logging.getLogger("app.pipeline.worker")
@@ -20,10 +21,12 @@ class MotionCaptureWorker:
         processing_queue: ProcessingQueue,
         processor: MotionCaptureProcessor | None = None,
         input_adapter: MotionCaptureInputAdapter | None = None,
+        result_store: JsonlTriangulationResultStore | None = None,
     ):
         self.processing_queue = processing_queue
         self.processor = processor or PlaceholderMotionCaptureProcessor()
         self.input_adapter = input_adapter or MotionCaptureInputAdapter()
+        self.result_store = result_store
         self._stop_event = Event()
         self._thread: Thread | None = None
         self.processed_count = 0
@@ -77,6 +80,16 @@ class MotionCaptureWorker:
                 self.last_processed_at = result.finished_at
                 self.last_result = result
                 self.last_error = None
+                if self.result_store is not None:
+                    self.result_store.save(
+                        frame_set=frame_set,
+                        processing_result=result,
+                        skeleton_result=getattr(
+                            self.processor,
+                            "last_skeleton_result",
+                            None,
+                        ),
+                    )
                 LOGGER.info(
                     "processed frame_set_id=%s cameras=%s status=%s",
                     frame_set.frame_set_id,

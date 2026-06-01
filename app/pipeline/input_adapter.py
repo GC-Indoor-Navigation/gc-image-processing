@@ -21,6 +21,7 @@ class MotionCaptureInput:
     anchor_timestamp_ms: int
     max_delta_ms: int
     frames: dict[str, CameraFrameInput]
+    relay_run_id: int | None = None
 
 
 class MotionCaptureInputAdapter:
@@ -29,6 +30,7 @@ class MotionCaptureInputAdapter:
             frame_set_id=frame_set.frame_set_id,
             anchor_timestamp_ms=frame_set.anchor_timestamp_ms,
             max_delta_ms=frame_set.max_delta_ms,
+            relay_run_id=frame_set.relay_run_id,
             frames={
                 device_id: CameraFrameInput(
                     device_id=frame.device_id,

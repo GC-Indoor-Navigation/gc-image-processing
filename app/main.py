@@ -15,6 +15,7 @@ from app.infrastructure.grpc_receiver import GrpcRelayReceiver
 from app.pipeline.queue import ProcessingQueue
 from app.pipeline.processor import MotionCaptureProcessor
 from app.pipeline.worker import MotionCaptureWorker
+from app.pipeline.result_store import JsonlTriangulationResultStore
 from app.services.processing import ProcessingService
 from app.sync.matcher import SyncMatcher
 
@@ -39,10 +40,16 @@ def create_app(
         else None
     )
     motion_capture_processor = build_motion_capture_processor(app_settings)
+    result_store = (
+        JsonlTriangulationResultStore(app_settings.result_storage_dir)
+        if app_settings.result_storage_enabled
+        else None
+    )
     motion_capture_worker = (
         MotionCaptureWorker(
             processing_queue=processing_queue,
             processor=motion_capture_processor,
+            result_store=result_store,
         )
         if app_settings.worker_enabled
         else None
@@ -56,6 +63,7 @@ def create_app(
         ),
         sync_matcher=sync_matcher,
         processing_queue=processing_queue,
+        relay_run_idle_reset_sec=app_settings.relay_run_idle_reset_sec,
     )
     grpc_receiver = (
         GrpcRelayReceiver(
@@ -96,6 +104,7 @@ def create_app(
     fastapi_app.state.grpc_receiver = grpc_receiver
     fastapi_app.state.processing_queue = processing_queue
     fastapi_app.state.motion_capture_worker = motion_capture_worker
+    fastapi_app.state.result_store = result_store
     fastapi_app.state.sync_matcher = sync_matcher
     fastapi_app.include_router(health_router)
     fastapi_app.include_router(status_router)
@@ -153,8 +162,11 @@ def parse_args():
     parser.add_argument("--debug-dump-max-per-camera", type=int, default=20)
     parser.add_argument("--sync-enabled", action="store_true")
     parser.add_argument("--sync-window-ms", type=int, default=50)
+    parser.add_argument("--relay-run-idle-reset-sec", type=float, default=5.0)
     parser.add_argument("--expected-camera", action="append", default=[])
     parser.add_argument("--disable-worker", action="store_true")
+    parser.add_argument("--result-storage-enabled", action="store_true")
+    parser.add_argument("--result-storage-dir", default="runtime/outputs/mmpose")
     parser.add_argument("--processor", default="placeholder")
     parser.add_argument("--mmpose-calib-json", default=None)
     parser.add_argument("--mmpose-camera-mapping", action="append", default=[])
@@ -192,8 +204,11 @@ def main():
         debug_dump_max_per_camera=args.debug_dump_max_per_camera,
         sync_enabled=args.sync_enabled,
         sync_window_ms=args.sync_window_ms,
+        relay_run_idle_reset_sec=args.relay_run_idle_reset_sec,
         expected_cameras=tuple(args.expected_camera),
         worker_enabled=not args.disable_worker,
+        result_storage_enabled=args.result_storage_enabled,
+        result_storage_dir=Path(args.result_storage_dir),
         processor=args.processor,
         mmpose_calib_json=(
             Path(args.mmpose_calib_json) if args.mmpose_calib_json else None

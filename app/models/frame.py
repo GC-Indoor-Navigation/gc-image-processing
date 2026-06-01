@@ -39,3 +39,4 @@ class SynchronizedFrameSet:
     anchor_timestamp_ms: int
     max_delta_ms: int
     frames: dict[str, StoredFrame]
+    relay_run_id: int | None = None

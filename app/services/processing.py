@@ -1,5 +1,6 @@
 import logging
 from threading import Lock
+from time import monotonic
 
 from app.buffers.frame_buffer import FrameBufferManager
 from app.infrastructure.debug_dump import DebugFrameDumper
@@ -20,6 +21,7 @@ class ProcessingService:
         debug_dumper: DebugFrameDumper | None = None,
         sync_matcher: SyncMatcher | None = None,
         processing_queue: ProcessingQueue | None = None,
+        relay_run_idle_reset_sec: float = 5.0,
     ):
         self.buffer_manager = buffer_manager
         self.debug_dumper = debug_dumper
@@ -28,6 +30,9 @@ class ProcessingService:
         self.accepted_relay_frame_set_count = 0
         self.duplicate_relay_frame_set_count = 0
         self.last_relay_frame_set_id: int | None = None
+        self.current_relay_run_id = 1
+        self.relay_run_idle_reset_sec = relay_run_idle_reset_sec
+        self.last_relay_frame_set_received_at: float | None = None
         self._seen_relay_frame_set_ids: set[int] = set()
         self._relay_frame_set_lock = Lock()
 
@@ -67,6 +72,17 @@ class ProcessingService:
         frame_set: RelayFrameSet,
     ) -> SynchronizedFrameSet | None:
         with self._relay_frame_set_lock:
+            now = monotonic()
+            if self._is_new_relay_run(frame_set.frame_set_id, now):
+                self.current_relay_run_id += 1
+                self._seen_relay_frame_set_ids.clear()
+                self.last_relay_frame_set_id = None
+                LOGGER.info(
+                    "started new relay run relay_run_id=%s frame_set_id=%s",
+                    self.current_relay_run_id,
+                    frame_set.frame_set_id,
+                )
+
             if frame_set.frame_set_id in self._seen_relay_frame_set_ids:
                 self.duplicate_relay_frame_set_count += 1
                 LOGGER.info(
@@ -81,9 +97,11 @@ class ProcessingService:
                 self.processing_queue.enqueue(synchronized_frame_set)
             self.accepted_relay_frame_set_count += 1
             self.last_relay_frame_set_id = frame_set.frame_set_id
+            self.last_relay_frame_set_received_at = now
 
         LOGGER.info(
-            "enqueued relay frame_set_id=%s cameras=%s",
+            "enqueued relay run_id=%s frame_set_id=%s cameras=%s",
+            synchronized_frame_set.relay_run_id,
             frame_set.frame_set_id,
             sorted(synchronized_frame_set.frames),
         )
@@ -95,6 +113,8 @@ class ProcessingService:
                 "accepted_count": self.accepted_relay_frame_set_count,
                 "duplicate_count": self.duplicate_relay_frame_set_count,
                 "last_frame_set_id": self.last_relay_frame_set_id,
+                "current_run_id": self.current_relay_run_id,
+                "run_idle_reset_sec": self.relay_run_idle_reset_sec,
             }
 
     def status(self) -> dict:
@@ -117,6 +137,7 @@ class ProcessingService:
             frame_set_id=frame_set.frame_set_id,
             anchor_timestamp_ms=frame_set.anchor_timestamp_ms,
             max_delta_ms=frame_set.max_delta_ms,
+            relay_run_id=self.current_relay_run_id,
             frames={
                 frame.device_id: StoredFrame(
                     device_id=frame.device_id,
@@ -131,3 +152,13 @@ class ProcessingService:
                 for frame in frame_set.frames
             },
         )
+
+    def _is_new_relay_run(self, frame_set_id: int, now: float) -> bool:
+        if self.last_relay_frame_set_id is None:
+            return False
+        if frame_set_id > self.last_relay_frame_set_id:
+            return False
+        if self.last_relay_frame_set_received_at is None:
+            return False
+        idle_sec = now - self.last_relay_frame_set_received_at
+        return idle_sec >= self.relay_run_idle_reset_sec

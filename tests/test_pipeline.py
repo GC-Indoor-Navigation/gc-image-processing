@@ -244,6 +244,8 @@ def test_processing_service_enqueues_relay_frame_set_without_sync_matcher():
         "accepted_count": 1,
         "duplicate_count": 0,
         "last_frame_set_id": 10,
+        "current_run_id": 1,
+        "run_idle_reset_sec": 5.0,
     }
 
 
@@ -265,3 +267,34 @@ def test_processing_service_ignores_duplicate_relay_frame_set_id():
 
     assert queue.status()["enqueued_count"] == 1
     assert service.relay_frame_set_status()["duplicate_count"] == 1
+
+
+def test_processing_service_starts_new_relay_run_after_idle_reset(monkeypatch):
+    ticks = iter([0.0, 10.0])
+    monkeypatch.setattr("app.services.processing.monotonic", lambda: next(ticks))
+    queue = ProcessingQueue()
+    service = ProcessingService(
+        buffer_manager=FrameBufferManager(buffer_size=120),
+        processing_queue=queue,
+        relay_run_idle_reset_sec=5.0,
+    )
+    first = RelayFrameSet(
+        frame_set_id=18,
+        anchor_timestamp_ms=1000,
+        max_delta_ms=10,
+        frames=(RelayFrameSetFrame("camera1", 1000, 1, "image/jpeg", b"frame"),),
+    )
+    second = RelayFrameSet(
+        frame_set_id=1,
+        anchor_timestamp_ms=2000,
+        max_delta_ms=10,
+        frames=(RelayFrameSetFrame("camera1", 2000, 1, "image/jpeg", b"frame"),),
+    )
+
+    assert service.handle_relay_frame_set(first) is not None
+    assert service.handle_relay_frame_set(second) is not None
+
+    assert queue.status()["enqueued_count"] == 2
+    assert queue.get(timeout=0.01).relay_run_id == 1
+    assert queue.get(timeout=0.01).relay_run_id == 2
+    assert service.relay_frame_set_status()["current_run_id"] == 2

@@ -7,16 +7,19 @@ from app.api.deps import (
     get_motion_capture_worker,
     get_processing_queue,
     get_processing_service,
+    get_result_store,
     get_settings,
     get_sync_matcher,
 )
 from app.core.config import Settings
 from app.pipeline.queue import ProcessingQueue
+from app.pipeline.result_store import JsonlTriangulationResultStore
 from app.pipeline.worker import MotionCaptureWorker
 from app.schemas.pipeline import (
     FrameSetResponse,
     LatestTriangulationResultResponse,
     PipelineStatusResponse,
+    ResultStorageStatusResponse,
 )
 from app.services.processing import ProcessingService
 from app.sync.matcher import SyncMatcher
@@ -89,6 +92,23 @@ def pipeline_status(
             **worker_status,
         },
     }
+
+
+@router.get(
+    "/pipeline/results/storage",
+    response_model=ResultStorageStatusResponse,
+)
+def result_storage_status(
+    result_store: JsonlTriangulationResultStore | None = Depends(get_result_store),
+):
+    if result_store is None:
+        return {
+            "enabled": False,
+            "output_dir": None,
+            "last_written_path": None,
+            "runs": {},
+        }
+    return result_store.status()
 
 
 @router.get(

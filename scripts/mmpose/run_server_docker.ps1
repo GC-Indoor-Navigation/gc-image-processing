@@ -17,6 +17,9 @@ param(
     [string]$ExtrinsicConvention = "world_to_camera",
     [string]$TempDir = "",
     [switch]$NoPreload,
+    [switch]$NoResultStorage,
+    [string]$ResultStorageDir = "runtime/outputs/mmpose",
+    [double]$RelayRunIdleResetSec = 5.0,
     [switch]$Cpu,
     [switch]$NoGpu
 )
@@ -52,6 +55,9 @@ $dockerArgs = @(
     "-e", "PROCESSING_HTTP_HOST=0.0.0.0",
     "-e", "PROCESSING_HTTP_PORT=9000",
     "-e", "PROCESSING_GRPC_BIND=0.0.0.0:50051",
+    "-e", "PROCESSING_RELAY_RUN_IDLE_RESET_SEC=$RelayRunIdleResetSec",
+    "-e", "PROCESSING_RESULT_STORAGE_ENABLED=$((-not $NoResultStorage.IsPresent).ToString().ToLowerInvariant())",
+    "-e", "PROCESSING_RESULT_STORAGE_DIR=/workspace/gc-image-processing/$($ResultStorageDir -replace "\\", "/")",
     "-e", "PROCESSING_PROCESSOR=mmpose_triangulation",
     "-e", "PROCESSING_MMPOSE_CALIB_JSON=$containerCalib",
     "-e", "PROCESSING_MMPOSE_CAMERA_MAPPING=$($CameraMapping -join ',')",
@@ -78,6 +84,7 @@ $dockerArgs += @(
     "--host", "0.0.0.0",
     "--port", "9000",
     "--grpc-bind", "0.0.0.0:50051",
+    "--relay-run-idle-reset-sec", "$RelayRunIdleResetSec",
     "--processor", "mmpose_triangulation",
     "--mmpose-calib-json", $containerCalib,
     "--mmpose-pose2d", $Pose2d,
@@ -100,6 +107,14 @@ if (-not $NoPreload) {
     $dockerArgs += "--mmpose-preload"
 }
 
+$containerResultStorageDir = "/workspace/gc-image-processing/$($ResultStorageDir -replace "\\", "/")"
+if (-not $NoResultStorage) {
+    $dockerArgs += @(
+        "--result-storage-enabled",
+        "--result-storage-dir", $containerResultStorageDir
+    )
+}
+
 if ($TempDir) {
     $dockerArgs += @("--mmpose-temp-dir", "/workspace/gc-image-processing/$($TempDir -replace "\\", "/")")
 }
@@ -112,6 +127,7 @@ Write-Host "Calib:   $containerCalib"
 Write-Host "Device:  $effectiveDevice"
 Write-Host "Mapping: $($CameraMapping -join ',')"
 Write-Host "Preload: $((-not $NoPreload.IsPresent).ToString().ToLowerInvariant())"
+Write-Host "Results: $containerResultStorageDir"
 
 docker @dockerArgs
 if ($LASTEXITCODE -ne 0) {

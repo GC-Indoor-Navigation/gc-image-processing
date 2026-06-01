@@ -21,8 +21,11 @@ class Settings:
     debug_dump_max_per_camera: int = 20
     sync_enabled: bool = False
     sync_window_ms: int = 50
+    relay_run_idle_reset_sec: float = 5.0
     expected_cameras: tuple[str, ...] = ()
     worker_enabled: bool = True
+    result_storage_enabled: bool = False
+    result_storage_dir: Path = Path("runtime/outputs/mmpose")
     processor: str = "placeholder"
     mmpose_calib_json: Path | None = None
     mmpose_camera_mapping: tuple[str, ...] = ()
@@ -52,8 +55,15 @@ def load_settings() -> Settings:
         ),
         sync_enabled=_env_bool("PROCESSING_SYNC_ENABLED", False),
         sync_window_ms=int(os.getenv("PROCESSING_SYNC_WINDOW_MS", "50")),
+        relay_run_idle_reset_sec=float(
+            os.getenv("PROCESSING_RELAY_RUN_IDLE_RESET_SEC", "5.0")
+        ),
         expected_cameras=_env_list("PROCESSING_EXPECTED_CAMERAS"),
         worker_enabled=_env_bool("PROCESSING_WORKER_ENABLED", True),
+        result_storage_enabled=_env_bool("PROCESSING_RESULT_STORAGE_ENABLED", False),
+        result_storage_dir=Path(
+            os.getenv("PROCESSING_RESULT_STORAGE_DIR", "runtime/outputs/mmpose")
+        ),
         processor=os.getenv("PROCESSING_PROCESSOR", "placeholder"),
         mmpose_calib_json=_env_optional_path("PROCESSING_MMPOSE_CALIB_JSON"),
         mmpose_camera_mapping=_env_list("PROCESSING_MMPOSE_CAMERA_MAPPING"),

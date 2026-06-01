@@ -28,6 +28,8 @@ class RelayFrameSetStatusResponse(BaseModel):
     accepted_count: int
     duplicate_count: int
     last_frame_set_id: int | None
+    current_run_id: int
+    run_idle_reset_sec: float
 
 
 class RelayPathStatusResponse(BaseModel):
@@ -70,6 +72,18 @@ class LatestTriangulationResultResponse(BaseModel):
     processing_result: ProcessingResultResponse | None
     result: dict[str, Any] | None
     last_error: str | None
+
+
+class ResultStorageRunResponse(BaseModel):
+    path: str
+    written_count: int
+
+
+class ResultStorageStatusResponse(BaseModel):
+    enabled: bool
+    output_dir: str | None
+    last_written_path: str | None
+    runs: dict[str, ResultStorageRunResponse]
 
 
 class FrameSetFrameResponse(BaseModel):
