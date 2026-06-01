@@ -34,6 +34,7 @@ class Settings:
     mmpose_extrinsic_source: str = "auto"
     mmpose_extrinsic_convention: str = "world_to_camera"
     mmpose_temp_dir: Path | None = None
+    mmpose_preload: bool = False
 
 
 def load_settings() -> Settings:
@@ -75,6 +76,7 @@ def load_settings() -> Settings:
             "world_to_camera",
         ),
         mmpose_temp_dir=_env_optional_path("PROCESSING_MMPOSE_TEMP_DIR"),
+        mmpose_preload=_env_bool("PROCESSING_MMPOSE_PRELOAD", False),
     )
 
 

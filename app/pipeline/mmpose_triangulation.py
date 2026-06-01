@@ -138,6 +138,9 @@ class MMPoseTriangulationProcessor:
             elapsed_ms=(finished_at - started_at) * 1000,
         )
 
+    def prepare(self):
+        self._ensure_ready()
+
     def _ensure_ready(self):
         if self._calibrations is None:
             camera_names = list(self.config.camera_mapping.values())

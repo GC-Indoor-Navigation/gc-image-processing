@@ -28,6 +28,7 @@ def test_load_settings_reads_project_env_file(tmp_path, monkeypatch):
         "PROCESSING_MMPOSE_EXTRINSIC_SOURCE",
         "PROCESSING_MMPOSE_EXTRINSIC_CONVENTION",
         "PROCESSING_MMPOSE_TEMP_DIR",
+        "PROCESSING_MMPOSE_PRELOAD",
     ]:
         monkeypatch.delenv(name, raising=False)
 
@@ -55,6 +56,7 @@ def test_load_settings_reads_project_env_file(tmp_path, monkeypatch):
                 "PROCESSING_MMPOSE_EXTRINSIC_SOURCE=bundle_adjusted",
                 "PROCESSING_MMPOSE_EXTRINSIC_CONVENTION=camera_to_world",
                 "PROCESSING_MMPOSE_TEMP_DIR=tmp/mmpose",
+                "PROCESSING_MMPOSE_PRELOAD=true",
             ]
         ),
         encoding="utf-8",
@@ -84,4 +86,5 @@ def test_load_settings_reads_project_env_file(tmp_path, monkeypatch):
         mmpose_extrinsic_source="bundle_adjusted",
         mmpose_extrinsic_convention="camera_to_world",
         mmpose_temp_dir=Path("tmp/mmpose"),
+        mmpose_preload=True,
     )

@@ -69,6 +69,12 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        if app_settings.mmpose_preload and motion_capture_processor is not None:
+            prepare_processor = getattr(motion_capture_processor, "prepare", None)
+            if callable(prepare_processor):
+                LOGGER.info("preloading motion capture processor")
+                prepare_processor()
+                LOGGER.info("motion capture processor preloaded")
         if motion_capture_worker is not None:
             motion_capture_worker.start()
         if grpc_receiver is not None:
@@ -160,6 +166,7 @@ def parse_args():
     parser.add_argument("--mmpose-extrinsic-source", default="auto")
     parser.add_argument("--mmpose-extrinsic-convention", default="world_to_camera")
     parser.add_argument("--mmpose-temp-dir", default=None)
+    parser.add_argument("--mmpose-preload", action="store_true")
     return parser.parse_args()
 
 
@@ -200,6 +207,7 @@ def main():
         mmpose_extrinsic_source=args.mmpose_extrinsic_source,
         mmpose_extrinsic_convention=args.mmpose_extrinsic_convention,
         mmpose_temp_dir=Path(args.mmpose_temp_dir) if args.mmpose_temp_dir else None,
+        mmpose_preload=args.mmpose_preload,
     )
     server_app = create_app(settings=settings)
     LOGGER.info(

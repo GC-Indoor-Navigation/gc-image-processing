@@ -16,6 +16,7 @@ param(
     [string]$ExtrinsicSource = "auto",
     [string]$ExtrinsicConvention = "world_to_camera",
     [string]$TempDir = "",
+    [switch]$NoPreload,
     [switch]$Cpu,
     [switch]$NoGpu
 )
@@ -60,7 +61,8 @@ $dockerArgs = @(
     "-e", "PROCESSING_MMPOSE_MAX_REPROJ_ERROR=$MaxReprojError",
     "-e", "PROCESSING_MMPOSE_IMAGES_UNDISTORTED=$($ImagesUndistorted.IsPresent.ToString().ToLowerInvariant())",
     "-e", "PROCESSING_MMPOSE_EXTRINSIC_SOURCE=$ExtrinsicSource",
-    "-e", "PROCESSING_MMPOSE_EXTRINSIC_CONVENTION=$ExtrinsicConvention"
+    "-e", "PROCESSING_MMPOSE_EXTRINSIC_CONVENTION=$ExtrinsicConvention",
+    "-e", "PROCESSING_MMPOSE_PRELOAD=$((-not $NoPreload.IsPresent).ToString().ToLowerInvariant())"
 )
 
 if ($TempDir) {
@@ -71,7 +73,36 @@ if (-not $NoGpu -and -not $Cpu) {
     $dockerArgs += @("--gpus", "all")
 }
 
-$dockerArgs += $Image
+$dockerArgs += @(
+    $Image,
+    "--host", "0.0.0.0",
+    "--port", "9000",
+    "--grpc-bind", "0.0.0.0:50051",
+    "--processor", "mmpose_triangulation",
+    "--mmpose-calib-json", $containerCalib,
+    "--mmpose-pose2d", $Pose2d,
+    "--mmpose-device", $effectiveDevice,
+    "--mmpose-kpt-thr", "$KptThr",
+    "--mmpose-max-reproj-error", "$MaxReprojError",
+    "--mmpose-extrinsic-source", $ExtrinsicSource,
+    "--mmpose-extrinsic-convention", $ExtrinsicConvention
+)
+
+foreach ($mapping in $CameraMapping) {
+    $dockerArgs += @("--mmpose-camera-mapping", $mapping)
+}
+
+if ($ImagesUndistorted) {
+    $dockerArgs += "--mmpose-images-undistorted"
+}
+
+if (-not $NoPreload) {
+    $dockerArgs += "--mmpose-preload"
+}
+
+if ($TempDir) {
+    $dockerArgs += @("--mmpose-temp-dir", "/workspace/gc-image-processing/$($TempDir -replace "\\", "/")")
+}
 
 Write-Host "Running MMPose processing server"
 Write-Host "Image:   $Image"
@@ -80,6 +111,7 @@ Write-Host "gRPC:    localhost:$GrpcPort"
 Write-Host "Calib:   $containerCalib"
 Write-Host "Device:  $effectiveDevice"
 Write-Host "Mapping: $($CameraMapping -join ',')"
+Write-Host "Preload: $((-not $NoPreload.IsPresent).ToString().ToLowerInvariant())"
 
 docker @dockerArgs
 if ($LASTEXITCODE -ne 0) {

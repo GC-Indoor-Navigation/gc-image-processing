@@ -4,6 +4,7 @@ from app.core.config import Settings
 from app.main import build_motion_capture_processor
 from app.pipeline.input_adapter import CameraFrameInput, MotionCaptureInput
 from app.pipeline.mmpose_triangulation import (
+    MMPoseTriangulationConfig,
     MMPoseTriangulationProcessor,
     load_calibrations,
     parse_camera_mapping,
@@ -79,6 +80,39 @@ def test_build_motion_capture_processor_builds_mmpose_processor(tmp_path):
 
     assert isinstance(processor, MMPoseTriangulationProcessor)
     assert processor.config.camera_mapping == {"camera1": "Camera1"}
+
+
+def test_mmpose_processor_prepare_loads_calibration_and_inferencer(tmp_path):
+    loaded = []
+
+    def calibration_loader(
+        calib_json,
+        camera_names,
+        extrinsic_source,
+        extrinsic_convention,
+    ):
+        loaded.append((calib_json, camera_names, extrinsic_source, extrinsic_convention))
+        return {"Camera1": object()}
+
+    processor = MMPoseTriangulationProcessor(
+        config=MMPoseTriangulationConfig(
+            calib_json=tmp_path / "calibration.json",
+            camera_mapping={"camera1": "Camera1"},
+        ),
+        inferencer=object(),
+        calibration_loader=calibration_loader,
+    )
+
+    processor.prepare()
+
+    assert loaded == [
+        (
+            str(tmp_path / "calibration.json"),
+            ["Camera1"],
+            "auto",
+            "world_to_camera",
+        )
+    ]
 
 
 def test_build_motion_capture_processor_requires_mmpose_calibration():
