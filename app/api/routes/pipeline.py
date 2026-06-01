@@ -2,6 +2,7 @@ from dataclasses import asdict, is_dataclass
 from typing import Any
 
 from fastapi import APIRouter, Depends
+from fastapi import HTTPException
 from fastapi import Query
 
 from app.api.deps import (
@@ -20,6 +21,7 @@ from app.schemas.pipeline import (
     FrameSetResponse,
     LatestTriangulationResultResponse,
     PipelineStatusResponse,
+    ResultDetailResponse,
     ResultHistoryItemResponse,
     ResultSummaryResponse,
     ResultStorageStatusResponse,
@@ -125,6 +127,25 @@ def result_history(
     if result_store is None:
         return []
     return result_store.read_history(limit=limit)
+
+
+@router.get(
+    "/pipeline/results/detail",
+    response_model=ResultDetailResponse,
+)
+def result_detail(
+    frame_set_id: int = Query(..., ge=0),
+    result_store: JsonlTriangulationResultStore | None = Depends(get_result_store),
+):
+    if result_store is None:
+        raise HTTPException(status_code=404, detail="result storage is disabled")
+    detail = result_store.read_detail(frame_set_id=frame_set_id)
+    if detail is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"result not found for frame_set_id={frame_set_id}",
+        )
+    return detail
 
 
 @router.get(

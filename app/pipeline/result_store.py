@@ -81,6 +81,28 @@ class JsonlTriangulationResultStore:
         )
         return [_to_history_item(entry) for entry in entries[:limit]]
 
+    def read_detail(self, frame_set_id: int) -> dict[str, Any] | None:
+        matches = []
+        for path in self._result_paths():
+            for entry in _read_jsonl(path):
+                if entry.get("frame_set_id") != frame_set_id:
+                    continue
+                matches.append((path, entry))
+        if not matches:
+            return None
+        path, entry = max(
+            matches,
+            key=lambda item: item[1].get("written_at") or 0,
+        )
+        return {
+            "path": str(path),
+            "written_at": entry.get("written_at"),
+            "relay_run_id": entry.get("relay_run_id"),
+            "frame_set_id": entry.get("frame_set_id"),
+            "processing_result": entry.get("processing_result"),
+            "triangulation_summary": entry.get("triangulation_summary"),
+        }
+
     def summarize(self) -> dict[str, Any]:
         runs = []
         for path in self._result_paths():
@@ -211,6 +233,10 @@ def _summarize_result_file(
     status_counts: dict[str, int] = {}
     frame_set_ids = []
     relay_run_ids = set()
+    worst_reproj_frame_set_id = None
+    worst_reproj_error = None
+    slowest_frame_set_id = None
+    max_elapsed_ms = None
 
     for entry in entries:
         processing_result = entry.get("processing_result") or {}
@@ -224,8 +250,24 @@ def _summarize_result_file(
         if isinstance(frame_set_id, int):
             frame_set_ids.append(frame_set_id)
         _append_number(valid_joint_counts, summary.get("num_valid_joints"))
-        _append_number(reproj_errors, summary.get("avg_reproj_error_px"))
-        _append_number(elapsed_times, processing_result.get("elapsed_ms"))
+        reproj_error = summary.get("avg_reproj_error_px")
+        elapsed_ms = processing_result.get("elapsed_ms")
+        _append_number(reproj_errors, reproj_error)
+        _append_number(elapsed_times, elapsed_ms)
+        if (
+            isinstance(frame_set_id, int)
+            and isinstance(reproj_error, int | float)
+            and (worst_reproj_error is None or reproj_error > worst_reproj_error)
+        ):
+            worst_reproj_error = float(reproj_error)
+            worst_reproj_frame_set_id = frame_set_id
+        if (
+            isinstance(frame_set_id, int)
+            and isinstance(elapsed_ms, int | float)
+            and (max_elapsed_ms is None or elapsed_ms > max_elapsed_ms)
+        ):
+            max_elapsed_ms = float(elapsed_ms)
+            slowest_frame_set_id = frame_set_id
 
     return {
         "relay_run_id": min(relay_run_ids) if relay_run_ids else 0,
@@ -239,6 +281,9 @@ def _summarize_result_file(
         "min_reproj_error_px": min(reproj_errors) if reproj_errors else None,
         "max_reproj_error_px": max(reproj_errors) if reproj_errors else None,
         "avg_elapsed_ms": _avg(elapsed_times),
+        "worst_reproj_frame_set_id": worst_reproj_frame_set_id,
+        "slowest_frame_set_id": slowest_frame_set_id,
+        "max_elapsed_ms": max_elapsed_ms,
     }
 
 

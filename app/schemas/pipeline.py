@@ -98,6 +98,15 @@ class ResultHistoryItemResponse(BaseModel):
     source_frames: dict[str, Any]
 
 
+class ResultDetailResponse(BaseModel):
+    path: str
+    written_at: float | None
+    relay_run_id: int | None
+    frame_set_id: int
+    processing_result: dict[str, Any] | None
+    triangulation_summary: dict[str, Any] | None
+
+
 class ResultSummaryRunResponse(BaseModel):
     relay_run_id: int
     path: str
@@ -110,6 +119,9 @@ class ResultSummaryRunResponse(BaseModel):
     min_reproj_error_px: float | None
     max_reproj_error_px: float | None
     avg_elapsed_ms: float | None
+    worst_reproj_frame_set_id: int | None
+    slowest_frame_set_id: int | None
+    max_elapsed_ms: float | None
 
 
 class ResultSummaryResponse(BaseModel):

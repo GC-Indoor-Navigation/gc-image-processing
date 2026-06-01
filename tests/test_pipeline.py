@@ -370,7 +370,10 @@ def test_jsonl_result_store_reads_history_and_summary(tmp_path):
         finished_at=2.0,
         elapsed_ms=1000.0,
     )
-    for frame_set_id, reproj_error in [(1, 12.0), (2, 18.0)]:
+    for frame_set_id, reproj_error, elapsed_ms in [
+        (1, 12.0, 1000.0),
+        (2, 18.0, 3000.0),
+    ]:
         store.save(
             SynchronizedFrameSet(
                 frame_set_id=frame_set_id,
@@ -385,7 +388,7 @@ def test_jsonl_result_store_reads_history_and_summary(tmp_path):
                 camera_count=processing_result.camera_count,
                 started_at=processing_result.started_at,
                 finished_at=processing_result.finished_at,
-                elapsed_ms=processing_result.elapsed_ms,
+                elapsed_ms=elapsed_ms,
             ),
             {
                 "frame_set_id": frame_set_id,
@@ -399,17 +402,24 @@ def test_jsonl_result_store_reads_history_and_summary(tmp_path):
         )
 
     history = store.read_history(limit=1)
+    detail = store.read_detail(frame_set_id=2)
     summary = store.summarize()
 
     assert len(history) == 1
     assert history[0]["frame_set_id"] == 2
     assert history[0]["avg_reproj_error_px"] == 18.0
+    assert detail is not None
+    assert detail["frame_set_id"] == 2
+    assert detail["triangulation_summary"]["avg_reproj_error_px"] == 18.0
     assert summary["run_count"] == 1
     assert summary["runs"][0]["result_count"] == 2
     assert summary["runs"][0]["avg_valid_joints"] == 17.0
     assert summary["runs"][0]["avg_reproj_error_px"] == 15.0
     assert summary["runs"][0]["min_reproj_error_px"] == 12.0
     assert summary["runs"][0]["max_reproj_error_px"] == 18.0
+    assert summary["runs"][0]["worst_reproj_frame_set_id"] == 2
+    assert summary["runs"][0]["slowest_frame_set_id"] == 2
+    assert summary["runs"][0]["max_elapsed_ms"] == 3000.0
 
 
 def test_jsonl_result_store_summarizes_restart_files_separately(tmp_path):

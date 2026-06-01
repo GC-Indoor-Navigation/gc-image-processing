@@ -223,15 +223,39 @@ def test_result_history_and_summary_endpoints_return_saved_results(tmp_path):
     )
 
     history_response = client.get("/pipeline/results/history?limit=5")
+    detail_response = client.get("/pipeline/results/detail?frame_set_id=10")
     summary_response = client.get("/pipeline/results/summary")
 
     assert history_response.status_code == 200
     assert history_response.json()[0]["frame_set_id"] == 10
     assert history_response.json()[0]["num_valid_joints"] == 17
+    assert detail_response.status_code == 200
+    assert detail_response.json()["frame_set_id"] == 10
+    assert detail_response.json()["triangulation_summary"]["avg_reproj_error_px"] == 2.5
     assert summary_response.status_code == 200
     assert summary_response.json()["run_count"] == 1
     assert summary_response.json()["runs"][0]["result_count"] == 1
     assert summary_response.json()["runs"][0]["avg_reproj_error_px"] == 2.5
+    assert summary_response.json()["runs"][0]["worst_reproj_frame_set_id"] == 10
+    assert summary_response.json()["runs"][0]["slowest_frame_set_id"] == 10
+
+
+def test_result_detail_endpoint_returns_404_for_missing_result(tmp_path):
+    service = ProcessingService(buffer_manager=FrameBufferManager(buffer_size=120))
+    app = create_app(
+        settings=Settings(
+            grpc_enabled=False,
+            result_storage_enabled=True,
+            result_storage_dir=tmp_path,
+        ),
+        service=service,
+    )
+    client = TestClient(app)
+
+    response = client.get("/pipeline/results/detail?frame_set_id=999")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "result not found for frame_set_id=999"
 
 
 def test_latest_pipeline_result_endpoint_returns_triangulation_result():
