@@ -99,6 +99,7 @@ class ResultHistoryItemResponse(BaseModel):
 
 
 class ResultDetailResponse(BaseModel):
+    run_key: str
     path: str
     written_at: float | None
     relay_run_id: int | None
@@ -109,6 +110,7 @@ class ResultDetailResponse(BaseModel):
 
 class ResultSummaryRunResponse(BaseModel):
     relay_run_id: int
+    run_key: str
     path: str
     result_count: int
     first_frame_set_id: int | None

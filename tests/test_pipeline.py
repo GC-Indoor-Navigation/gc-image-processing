@@ -404,15 +404,23 @@ def test_jsonl_result_store_reads_history_and_summary(tmp_path):
     history = store.read_history(limit=1)
     detail = store.read_detail(frame_set_id=2)
     summary = store.summarize()
+    run_key = summary["runs"][0]["run_key"]
+    filtered_history = store.read_history(limit=10, run_key=run_key)
+    filtered_detail = store.read_detail(frame_set_id=2, run_key=run_key)
 
     assert len(history) == 1
     assert history[0]["frame_set_id"] == 2
     assert history[0]["avg_reproj_error_px"] == 18.0
     assert detail is not None
+    assert detail["run_key"] == run_key
     assert detail["frame_set_id"] == 2
     assert detail["triangulation_summary"]["avg_reproj_error_px"] == 18.0
+    assert len(filtered_history) == 2
+    assert filtered_detail is not None
+    assert filtered_detail["frame_set_id"] == 2
     assert summary["run_count"] == 1
     assert summary["runs"][0]["result_count"] == 2
+    assert summary["runs"][0]["run_key"] == run_key
     assert summary["runs"][0]["avg_valid_joints"] == 17.0
     assert summary["runs"][0]["avg_reproj_error_px"] == 15.0
     assert summary["runs"][0]["min_reproj_error_px"] == 12.0
@@ -485,3 +493,50 @@ def test_jsonl_result_store_summarizes_restart_files_separately(tmp_path):
 
     assert summary["run_count"] == 2
     assert sorted(run["result_count"] for run in summary["runs"]) == [1, 2]
+
+
+def test_jsonl_result_store_filters_history_and_detail_by_run_key(tmp_path):
+    first = tmp_path / "relay_run_0001_first.jsonl"
+    second = tmp_path / "relay_run_0001_second.jsonl"
+    first.write_text(
+        json.dumps(
+            {
+                "written_at": 1.0,
+                "relay_run_id": 1,
+                "frame_set_id": 7,
+                "processing_result": {"status": "first", "elapsed_ms": 10.0},
+                "triangulation_summary": {
+                    "num_valid_joints": 10,
+                    "avg_reproj_error_px": 1.0,
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    second.write_text(
+        json.dumps(
+            {
+                "written_at": 2.0,
+                "relay_run_id": 1,
+                "frame_set_id": 7,
+                "processing_result": {"status": "second", "elapsed_ms": 20.0},
+                "triangulation_summary": {
+                    "num_valid_joints": 17,
+                    "avg_reproj_error_px": 2.0,
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    store = JsonlTriangulationResultStore(tmp_path)
+
+    history = store.read_history(limit=10, run_key="relay_run_0001_first")
+    detail = store.read_detail(frame_set_id=7, run_key="relay_run_0001_first")
+
+    assert len(history) == 1
+    assert history[0]["status"] == "first"
+    assert detail is not None
+    assert detail["run_key"] == "relay_run_0001_first"
+    assert detail["processing_result"]["status"] == "first"

@@ -68,9 +68,13 @@ class JsonlTriangulationResultStore:
                 },
             }
 
-    def read_history(self, limit: int = 20) -> list[dict[str, Any]]:
+    def read_history(
+        self,
+        limit: int = 20,
+        run_key: str | None = None,
+    ) -> list[dict[str, Any]]:
         limit = max(1, min(limit, 500))
-        entries = self._read_all_entries()
+        entries = self._read_all_entries(run_key=run_key)
         entries.sort(
             key=lambda entry: (
                 entry.get("written_at") or 0,
@@ -81,9 +85,13 @@ class JsonlTriangulationResultStore:
         )
         return [_to_history_item(entry) for entry in entries[:limit]]
 
-    def read_detail(self, frame_set_id: int) -> dict[str, Any] | None:
+    def read_detail(
+        self,
+        frame_set_id: int,
+        run_key: str | None = None,
+    ) -> dict[str, Any] | None:
         matches = []
-        for path in self._result_paths():
+        for path in self._result_paths(run_key=run_key):
             for entry in _read_jsonl(path):
                 if entry.get("frame_set_id") != frame_set_id:
                     continue
@@ -95,6 +103,7 @@ class JsonlTriangulationResultStore:
             key=lambda item: item[1].get("written_at") or 0,
         )
         return {
+            "run_key": path.stem,
             "path": str(path),
             "written_at": entry.get("written_at"),
             "relay_run_id": entry.get("relay_run_id"),
@@ -126,16 +135,18 @@ class JsonlTriangulationResultStore:
             self._paths_by_run_id[run_id] = path
         return path
 
-    def _read_all_entries(self) -> list[dict[str, Any]]:
+    def _read_all_entries(self, run_key: str | None = None) -> list[dict[str, Any]]:
         entries = []
-        for path in self._result_paths():
+        for path in self._result_paths(run_key=run_key):
             entries.extend(_read_jsonl(path))
         return entries
 
-    def _result_paths(self) -> list[Path]:
+    def _result_paths(self, run_key: str | None = None) -> list[Path]:
         paths = set(self._paths_by_run_id.values())
         if self.output_dir.exists():
             paths.update(self.output_dir.glob("relay_run_*.jsonl"))
+        if run_key is not None:
+            paths = {path for path in paths if path.stem == run_key}
         return sorted(paths, key=lambda path: path.stat().st_mtime if path.exists() else 0)
 
 
@@ -271,6 +282,7 @@ def _summarize_result_file(
 
     return {
         "relay_run_id": min(relay_run_ids) if relay_run_ids else 0,
+        "run_key": path.stem,
         "path": str(path),
         "result_count": len(entries),
         "first_frame_set_id": min(frame_set_ids) if frame_set_ids else None,

@@ -234,10 +234,24 @@ def test_result_history_and_summary_endpoints_return_saved_results(tmp_path):
     assert detail_response.json()["triangulation_summary"]["avg_reproj_error_px"] == 2.5
     assert summary_response.status_code == 200
     assert summary_response.json()["run_count"] == 1
-    assert summary_response.json()["runs"][0]["result_count"] == 1
-    assert summary_response.json()["runs"][0]["avg_reproj_error_px"] == 2.5
-    assert summary_response.json()["runs"][0]["worst_reproj_frame_set_id"] == 10
-    assert summary_response.json()["runs"][0]["slowest_frame_set_id"] == 10
+    run = summary_response.json()["runs"][0]
+    assert run["result_count"] == 1
+    assert run["avg_reproj_error_px"] == 2.5
+    assert run["worst_reproj_frame_set_id"] == 10
+    assert run["slowest_frame_set_id"] == 10
+    assert run["run_key"].startswith("relay_run_")
+
+    filtered_history_response = client.get(
+        f"/pipeline/results/history?run_key={run['run_key']}"
+    )
+    filtered_detail_response = client.get(
+        f"/pipeline/results/detail?run_key={run['run_key']}&frame_set_id=10"
+    )
+
+    assert filtered_history_response.status_code == 200
+    assert filtered_history_response.json()[0]["frame_set_id"] == 10
+    assert filtered_detail_response.status_code == 200
+    assert filtered_detail_response.json()["run_key"] == run["run_key"]
 
 
 def test_result_detail_endpoint_returns_404_for_missing_result(tmp_path):

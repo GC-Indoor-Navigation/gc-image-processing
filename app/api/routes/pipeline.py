@@ -122,11 +122,12 @@ def result_storage_status(
 )
 def result_history(
     limit: int = Query(20, ge=1, le=500),
+    run_key: str | None = Query(None),
     result_store: JsonlTriangulationResultStore | None = Depends(get_result_store),
 ):
     if result_store is None:
         return []
-    return result_store.read_history(limit=limit)
+    return result_store.read_history(limit=limit, run_key=run_key)
 
 
 @router.get(
@@ -135,15 +136,17 @@ def result_history(
 )
 def result_detail(
     frame_set_id: int = Query(..., ge=0),
+    run_key: str | None = Query(None),
     result_store: JsonlTriangulationResultStore | None = Depends(get_result_store),
 ):
     if result_store is None:
         raise HTTPException(status_code=404, detail="result storage is disabled")
-    detail = result_store.read_detail(frame_set_id=frame_set_id)
+    detail = result_store.read_detail(frame_set_id=frame_set_id, run_key=run_key)
     if detail is None:
+        run_context = f" run_key={run_key}" if run_key is not None else ""
         raise HTTPException(
             status_code=404,
-            detail=f"result not found for frame_set_id={frame_set_id}",
+            detail=f"result not found for frame_set_id={frame_set_id}{run_context}",
         )
     return detail
 
