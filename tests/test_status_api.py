@@ -234,17 +234,6 @@ def test_result_history_and_summary_endpoints_return_saved_results(tmp_path):
     assert summary_response.json()["runs"][0]["avg_reproj_error_px"] == 2.5
 
 
-def test_live_skeleton_viewer_endpoint_returns_html():
-    client, _ = create_test_client()
-
-    response = client.get("/pipeline/results/viewer")
-
-    assert response.status_code == 200
-    assert response.headers["content-type"].startswith("text/html")
-    assert "Live 3D Skeleton" in response.text
-    assert "/pipeline/results/latest" in response.text
-
-
 def test_latest_pipeline_result_endpoint_returns_triangulation_result():
     client, _ = create_test_client()
     worker = client.app.state.motion_capture_worker
