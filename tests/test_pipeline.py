@@ -357,3 +357,55 @@ def test_jsonl_result_store_writes_compact_triangulation_summary(tmp_path):
     assert summary["joint_reproj_error_px"] == {"nose": 4.5}
     assert "joints_camera" not in summary
     assert "keypoints_by_camera" not in summary
+
+
+def test_jsonl_result_store_reads_history_and_summary(tmp_path):
+    store = JsonlTriangulationResultStore(tmp_path)
+    processing_result = ProcessingResult(
+        frame_set_id=1,
+        status="mmpose_triangulated",
+        camera_count=3,
+        started_at=1.0,
+        finished_at=2.0,
+        elapsed_ms=1000.0,
+    )
+    for frame_set_id, reproj_error in [(1, 12.0), (2, 18.0)]:
+        store.save(
+            SynchronizedFrameSet(
+                frame_set_id=frame_set_id,
+                anchor_timestamp_ms=1000 + frame_set_id,
+                max_delta_ms=10,
+                relay_run_id=1,
+                frames={},
+            ),
+            ProcessingResult(
+                frame_set_id=frame_set_id,
+                status=processing_result.status,
+                camera_count=processing_result.camera_count,
+                started_at=processing_result.started_at,
+                finished_at=processing_result.finished_at,
+                elapsed_ms=processing_result.elapsed_ms,
+            ),
+            {
+                "frame_set_id": frame_set_id,
+                "anchor_timestamp_ms": 1000 + frame_set_id,
+                "max_delta_ms": 10,
+                "num_valid_joints": 17,
+                "avg_reproj_error_px": reproj_error,
+                "joints_world": {},
+                "source_frames": {},
+            },
+        )
+
+    history = store.read_history(limit=1)
+    summary = store.summarize()
+
+    assert len(history) == 1
+    assert history[0]["frame_set_id"] == 2
+    assert history[0]["avg_reproj_error_px"] == 18.0
+    assert summary["run_count"] == 1
+    assert summary["runs"][0]["result_count"] == 2
+    assert summary["runs"][0]["avg_valid_joints"] == 17.0
+    assert summary["runs"][0]["avg_reproj_error_px"] == 15.0
+    assert summary["runs"][0]["min_reproj_error_px"] == 12.0
+    assert summary["runs"][0]["max_reproj_error_px"] == 18.0

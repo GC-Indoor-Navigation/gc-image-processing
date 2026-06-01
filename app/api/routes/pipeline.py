@@ -2,6 +2,7 @@ from dataclasses import asdict, is_dataclass
 from typing import Any
 
 from fastapi import APIRouter, Depends
+from fastapi import Query
 
 from app.api.deps import (
     get_motion_capture_worker,
@@ -19,6 +20,8 @@ from app.schemas.pipeline import (
     FrameSetResponse,
     LatestTriangulationResultResponse,
     PipelineStatusResponse,
+    ResultHistoryItemResponse,
+    ResultSummaryResponse,
     ResultStorageStatusResponse,
 )
 from app.services.processing import ProcessingService
@@ -109,6 +112,36 @@ def result_storage_status(
             "runs": {},
         }
     return result_store.status()
+
+
+@router.get(
+    "/pipeline/results/history",
+    response_model=list[ResultHistoryItemResponse],
+)
+def result_history(
+    limit: int = Query(20, ge=1, le=500),
+    result_store: JsonlTriangulationResultStore | None = Depends(get_result_store),
+):
+    if result_store is None:
+        return []
+    return result_store.read_history(limit=limit)
+
+
+@router.get(
+    "/pipeline/results/summary",
+    response_model=ResultSummaryResponse,
+)
+def result_summary(
+    result_store: JsonlTriangulationResultStore | None = Depends(get_result_store),
+):
+    if result_store is None:
+        return {
+            "enabled": False,
+            "output_dir": None,
+            "run_count": 0,
+            "runs": [],
+        }
+    return result_store.summarize()
 
 
 @router.get(

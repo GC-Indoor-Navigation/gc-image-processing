@@ -86,6 +86,39 @@ class ResultStorageStatusResponse(BaseModel):
     runs: dict[str, ResultStorageRunResponse]
 
 
+class ResultHistoryItemResponse(BaseModel):
+    written_at: float | None
+    relay_run_id: int | None
+    frame_set_id: int | None
+    status: str | None
+    elapsed_ms: float | None
+    num_valid_joints: int | None
+    avg_reproj_error_px: float | None
+    max_delta_ms: int | None
+    source_frames: dict[str, Any]
+
+
+class ResultSummaryRunResponse(BaseModel):
+    relay_run_id: int
+    path: str
+    result_count: int
+    first_frame_set_id: int | None
+    last_frame_set_id: int | None
+    status_counts: dict[str, int]
+    avg_valid_joints: float | None
+    avg_reproj_error_px: float | None
+    min_reproj_error_px: float | None
+    max_reproj_error_px: float | None
+    avg_elapsed_ms: float | None
+
+
+class ResultSummaryResponse(BaseModel):
+    enabled: bool
+    output_dir: str | None
+    run_count: int
+    runs: list[ResultSummaryRunResponse]
+
+
 class FrameSetFrameResponse(BaseModel):
     device_id: str
     timestamp_ms: int

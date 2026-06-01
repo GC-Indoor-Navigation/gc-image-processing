@@ -68,6 +68,39 @@ class JsonlTriangulationResultStore:
                 },
             }
 
+    def read_history(self, limit: int = 20) -> list[dict[str, Any]]:
+        limit = max(1, min(limit, 500))
+        entries = self._read_all_entries()
+        entries.sort(
+            key=lambda entry: (
+                entry.get("written_at") or 0,
+                entry.get("relay_run_id") or 0,
+                entry.get("frame_set_id") or 0,
+            ),
+            reverse=True,
+        )
+        return [_to_history_item(entry) for entry in entries[:limit]]
+
+    def summarize(self) -> dict[str, Any]:
+        entries_by_run: dict[int, list[dict[str, Any]]] = {}
+        path_by_run: dict[int, Path] = {}
+        for path in self._result_paths():
+            for entry in _read_jsonl(path):
+                run_id = int(entry.get("relay_run_id") or 0)
+                entries_by_run.setdefault(run_id, []).append(entry)
+                path_by_run[run_id] = path
+
+        runs = []
+        for run_id, entries in sorted(entries_by_run.items()):
+            runs.append(_summarize_run(run_id, path_by_run[run_id], entries))
+
+        return {
+            "enabled": True,
+            "output_dir": str(self.output_dir),
+            "run_count": len(runs),
+            "runs": runs,
+        }
+
     def _path_for_run(self, run_id: int) -> Path:
         path = self._paths_by_run_id.get(run_id)
         if path is None:
@@ -75,6 +108,18 @@ class JsonlTriangulationResultStore:
             path = self.output_dir / f"relay_run_{run_id:04d}_{timestamp}.jsonl"
             self._paths_by_run_id[run_id] = path
         return path
+
+    def _read_all_entries(self) -> list[dict[str, Any]]:
+        entries = []
+        for path in self._result_paths():
+            entries.extend(_read_jsonl(path))
+        return entries
+
+    def _result_paths(self) -> list[Path]:
+        paths = set(self._paths_by_run_id.values())
+        if self.output_dir.exists():
+            paths.update(self.output_dir.glob("relay_run_*.jsonl"))
+        return sorted(paths, key=lambda path: path.stat().st_mtime if path.exists() else 0)
 
 
 def _to_jsonable(value: Any) -> Any:
@@ -125,3 +170,86 @@ def _to_summary(value: Any) -> dict[str, Any] | None:
             if isinstance(frame, dict)
         },
     }
+
+
+def _read_jsonl(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    entries = []
+    with path.open("r", encoding="utf-8") as file:
+        for line in file:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(entry, dict):
+                entries.append(entry)
+    return entries
+
+
+def _to_history_item(entry: dict[str, Any]) -> dict[str, Any]:
+    processing_result = entry.get("processing_result") or {}
+    summary = entry.get("triangulation_summary") or {}
+    return {
+        "written_at": entry.get("written_at"),
+        "relay_run_id": entry.get("relay_run_id"),
+        "frame_set_id": entry.get("frame_set_id"),
+        "status": processing_result.get("status"),
+        "elapsed_ms": processing_result.get("elapsed_ms"),
+        "num_valid_joints": summary.get("num_valid_joints"),
+        "avg_reproj_error_px": summary.get("avg_reproj_error_px"),
+        "max_delta_ms": summary.get("max_delta_ms"),
+        "source_frames": summary.get("source_frames") or {},
+    }
+
+
+def _summarize_run(
+    run_id: int,
+    path: Path,
+    entries: list[dict[str, Any]],
+) -> dict[str, Any]:
+    valid_joint_counts = []
+    reproj_errors = []
+    elapsed_times = []
+    status_counts: dict[str, int] = {}
+    frame_set_ids = []
+
+    for entry in entries:
+        processing_result = entry.get("processing_result") or {}
+        summary = entry.get("triangulation_summary") or {}
+        status = processing_result.get("status") or "unknown"
+        status_counts[status] = status_counts.get(status, 0) + 1
+        frame_set_id = entry.get("frame_set_id")
+        if isinstance(frame_set_id, int):
+            frame_set_ids.append(frame_set_id)
+        _append_number(valid_joint_counts, summary.get("num_valid_joints"))
+        _append_number(reproj_errors, summary.get("avg_reproj_error_px"))
+        _append_number(elapsed_times, processing_result.get("elapsed_ms"))
+
+    return {
+        "relay_run_id": run_id,
+        "path": str(path),
+        "result_count": len(entries),
+        "first_frame_set_id": min(frame_set_ids) if frame_set_ids else None,
+        "last_frame_set_id": max(frame_set_ids) if frame_set_ids else None,
+        "status_counts": status_counts,
+        "avg_valid_joints": _avg(valid_joint_counts),
+        "avg_reproj_error_px": _avg(reproj_errors),
+        "min_reproj_error_px": min(reproj_errors) if reproj_errors else None,
+        "max_reproj_error_px": max(reproj_errors) if reproj_errors else None,
+        "avg_elapsed_ms": _avg(elapsed_times),
+    }
+
+
+def _append_number(values: list[float], value: Any):
+    if isinstance(value, int | float):
+        values.append(float(value))
+
+
+def _avg(values: list[float]) -> float | None:
+    if not values:
+        return None
+    return sum(values) / len(values)

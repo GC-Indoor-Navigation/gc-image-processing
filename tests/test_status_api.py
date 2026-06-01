@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 from app.buffers.frame_buffer import FrameBufferManager
 from app.core.config import Settings
 from app.infrastructure.relay_contract import RelayFrame
+from app.models.frame import SynchronizedFrameSet
 from app.main import create_app
 from app.pipeline.processor import ProcessingResult
 from app.pipeline.queue import ProcessingQueue
@@ -180,6 +181,57 @@ def test_latest_pipeline_result_endpoint_returns_empty_state():
     assert body["processing_result"] is None
     assert body["result"] is None
     assert body["last_error"] is None
+
+
+def test_result_history_and_summary_endpoints_return_saved_results(tmp_path):
+    service = ProcessingService(buffer_manager=FrameBufferManager(buffer_size=120))
+    app = create_app(
+        settings=Settings(
+            grpc_enabled=False,
+            result_storage_enabled=True,
+            result_storage_dir=tmp_path,
+        ),
+        service=service,
+    )
+    client = TestClient(app)
+    result_store = app.state.result_store
+    result_store.save(
+        SynchronizedFrameSet(
+            frame_set_id=10,
+            anchor_timestamp_ms=1000,
+            max_delta_ms=8,
+            relay_run_id=1,
+            frames={},
+        ),
+        ProcessingResult(
+            frame_set_id=10,
+            status="mmpose_triangulated",
+            camera_count=3,
+            started_at=1.0,
+            finished_at=2.0,
+            elapsed_ms=1000.0,
+        ),
+        {
+            "frame_set_id": 10,
+            "anchor_timestamp_ms": 1000,
+            "max_delta_ms": 8,
+            "num_valid_joints": 17,
+            "avg_reproj_error_px": 2.5,
+            "joints_world": {},
+            "source_frames": {},
+        },
+    )
+
+    history_response = client.get("/pipeline/results/history?limit=5")
+    summary_response = client.get("/pipeline/results/summary")
+
+    assert history_response.status_code == 200
+    assert history_response.json()[0]["frame_set_id"] == 10
+    assert history_response.json()[0]["num_valid_joints"] == 17
+    assert summary_response.status_code == 200
+    assert summary_response.json()["run_count"] == 1
+    assert summary_response.json()["runs"][0]["result_count"] == 1
+    assert summary_response.json()["runs"][0]["avg_reproj_error_px"] == 2.5
 
 
 def test_latest_pipeline_result_endpoint_returns_triangulation_result():
