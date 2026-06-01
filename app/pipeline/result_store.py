@@ -30,7 +30,7 @@ class JsonlTriangulationResultStore:
             "relay_run_id": run_id,
             "frame_set_id": frame_set.frame_set_id,
             "processing_result": asdict(processing_result),
-            "triangulation_result": _to_jsonable(skeleton_result),
+            "triangulation_summary": _to_summary(skeleton_result),
         }
         line = json.dumps(entry, ensure_ascii=False, separators=(",", ":"))
 
@@ -85,3 +85,43 @@ def _to_jsonable(value: Any) -> Any:
     if isinstance(value, dict):
         return value
     return value
+
+
+def _to_summary(value: Any) -> dict[str, Any] | None:
+    result = _to_jsonable(value)
+    if result is None:
+        return None
+    source_frames = result.get("source_frames") or {}
+    return {
+        "frame_set_id": result.get("frame_set_id"),
+        "anchor_timestamp_ms": result.get("anchor_timestamp_ms"),
+        "max_delta_ms": result.get("max_delta_ms"),
+        "num_valid_joints": result.get("num_valid_joints"),
+        "avg_reproj_error_px": result.get("avg_reproj_error_px"),
+        "joints_world": {
+            joint_name: joint.get("xyz")
+            for joint_name, joint in (result.get("joints_world") or {}).items()
+            if isinstance(joint, dict)
+        },
+        "joint_scores": {
+            joint_name: joint.get("score")
+            for joint_name, joint in (result.get("joints_world") or {}).items()
+            if isinstance(joint, dict)
+        },
+        "joint_reproj_error_px": {
+            joint_name: joint.get("reproj_error_px")
+            for joint_name, joint in (result.get("joints_world") or {}).items()
+            if isinstance(joint, dict)
+        },
+        "source_frames": {
+            camera_name: {
+                "device_id": frame.get("device_id"),
+                "timestamp_ms": frame.get("timestamp_ms"),
+                "sequence": frame.get("sequence"),
+                "source_file_path": frame.get("source_file_path"),
+                "source_frame_id": frame.get("source_frame_id"),
+            }
+            for camera_name, frame in source_frames.items()
+            if isinstance(frame, dict)
+        },
+    }

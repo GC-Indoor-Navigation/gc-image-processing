@@ -11,6 +11,7 @@ from app.pipeline.external_processor import ExternalMotionCaptureProcessor
 from app.pipeline.input_adapter import MotionCaptureInputAdapter
 from app.pipeline.processor import PlaceholderMotionCaptureProcessor, ProcessingResult
 from app.pipeline.queue import ProcessingQueue
+from app.pipeline.result_store import JsonlTriangulationResultStore
 from app.pipeline.worker import MotionCaptureWorker
 from app.services.processing import ProcessingService
 from app.sync.matcher import SyncMatcher
@@ -298,3 +299,61 @@ def test_processing_service_starts_new_relay_run_after_idle_reset(monkeypatch):
     assert queue.get(timeout=0.01).relay_run_id == 1
     assert queue.get(timeout=0.01).relay_run_id == 2
     assert service.relay_frame_set_status()["current_run_id"] == 2
+
+
+def test_jsonl_result_store_writes_compact_triangulation_summary(tmp_path):
+    frame_set = SynchronizedFrameSet(
+        frame_set_id=3,
+        anchor_timestamp_ms=1000,
+        max_delta_ms=10,
+        relay_run_id=2,
+        frames={},
+    )
+    processing_result = ProcessingResult(
+        frame_set_id=3,
+        status="mmpose_triangulated",
+        camera_count=3,
+        started_at=1.0,
+        finished_at=2.0,
+        elapsed_ms=1000.0,
+    )
+    skeleton_result = {
+        "frame_set_id": 3,
+        "anchor_timestamp_ms": 1000,
+        "max_delta_ms": 10,
+        "num_valid_joints": 1,
+        "avg_reproj_error_px": 12.5,
+        "joints_world": {
+            "nose": {
+                "xyz": [1.0, 2.0, 3.0],
+                "score": 0.9,
+                "reproj_error_px": 4.5,
+                "reproj_error_by_camera_px": {"Camera1": 5.0},
+            }
+        },
+        "joints_camera": {"Camera1": {"nose": [1.0, 2.0, 3.0]}},
+        "keypoints_by_camera": {"Camera1": {"nose": [10.0, 20.0]}},
+        "source_frames": {
+            "Camera1": {
+                "device_id": "android_device_001",
+                "timestamp_ms": 1000,
+                "sequence": 7,
+                "source_file_path": "storage/camera1/frame.jpg",
+                "source_frame_id": 77,
+            }
+        },
+    }
+    store = JsonlTriangulationResultStore(tmp_path)
+
+    path = store.save(frame_set, processing_result, skeleton_result)
+
+    import json
+
+    saved = json.loads(path.read_text(encoding="utf-8").strip())
+    summary = saved["triangulation_summary"]
+    assert saved["relay_run_id"] == 2
+    assert summary["joints_world"] == {"nose": [1.0, 2.0, 3.0]}
+    assert summary["joint_scores"] == {"nose": 0.9}
+    assert summary["joint_reproj_error_px"] == {"nose": 4.5}
+    assert "joints_camera" not in summary
+    assert "keypoints_by_camera" not in summary
