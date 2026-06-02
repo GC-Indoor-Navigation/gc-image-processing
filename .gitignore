@@ -9,6 +9,7 @@ runtime/*
 !runtime/calibration.env.example
 
 .env
+AGENTS.md
 WORKLOG.md
 docs/
 
