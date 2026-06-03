@@ -91,10 +91,20 @@ class MotionCaptureWorker:
                         ),
                     )
                 LOGGER.info(
-                    "processed frame_set_id=%s cameras=%s status=%s",
+                    (
+                        "processed frame_set_id=%s cameras=%s status=%s "
+                        "elapsed_ms=%.2f elapsed_sec=%.3f "
+                        "per_camera_frame_ms=%s effective_frame_set_fps=%s"
+                    ),
                     frame_set.frame_set_id,
                     sorted(frame_set.frames),
                     result.status,
+                    result.elapsed_ms,
+                    result.elapsed_ms / 1000,
+                    _format_optional_float(
+                        _per_camera_frame_ms(result.elapsed_ms, result.camera_count)
+                    ),
+                    _format_optional_float(_effective_fps(result.elapsed_ms)),
                 )
             except Exception as exc:
                 self.error_count += 1
@@ -102,3 +112,21 @@ class MotionCaptureWorker:
                 LOGGER.exception("motion capture worker failed")
             finally:
                 self.processing_queue.task_done()
+
+
+def _per_camera_frame_ms(elapsed_ms: float, camera_count: int) -> float | None:
+    if camera_count <= 0:
+        return None
+    return elapsed_ms / camera_count
+
+
+def _effective_fps(elapsed_ms: float) -> float | None:
+    if elapsed_ms <= 0:
+        return None
+    return 1000 / elapsed_ms
+
+
+def _format_optional_float(value: float | None) -> str:
+    if value is None:
+        return "n/a"
+    return f"{value:.3f}"

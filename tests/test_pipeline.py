@@ -1,4 +1,5 @@
 import json
+import logging
 from time import sleep
 
 from app.buffers.frame_buffer import FrameBufferManager
@@ -64,7 +65,9 @@ def test_motion_capture_worker_processes_queued_frame_set():
         worker.stop()
 
 
-def test_motion_capture_worker_delegates_to_processor():
+def test_motion_capture_worker_delegates_to_processor(caplog):
+    caplog.set_level(logging.INFO, logger="app.pipeline.worker")
+
     class RecordingProcessor:
         def __init__(self):
             self.received = []
@@ -87,7 +90,26 @@ def test_motion_capture_worker_delegates_to_processor():
         frame_set_id=2,
         anchor_timestamp_ms=1000,
         max_delta_ms=0,
-        frames={},
+        frames={
+            "camera1": StoredFrame(
+                device_id="camera1",
+                timestamp_ms=1000,
+                sequence=1,
+                content_type="image/jpeg",
+                image_bytes=b"frame-1",
+                image_size=7,
+                source_file_path=None,
+            ),
+            "camera2": StoredFrame(
+                device_id="camera2",
+                timestamp_ms=1000,
+                sequence=1,
+                content_type="image/jpeg",
+                image_bytes=b"frame-2",
+                image_size=7,
+                source_file_path=None,
+            ),
+        },
     )
 
     worker.start()
@@ -101,6 +123,9 @@ def test_motion_capture_worker_delegates_to_processor():
         assert processor.received[0].frame_set_id == frame_set.frame_set_id
         assert worker.status()["last_result"]["status"] == "processed_by_test"
         assert worker.status()["last_processed_at"] == 2.0
+        assert "elapsed_ms=1000.00" in caplog.text
+        assert "per_camera_frame_ms=500.000" in caplog.text
+        assert "effective_frame_set_fps=1.000" in caplog.text
     finally:
         worker.stop()
 
@@ -425,6 +450,7 @@ def test_jsonl_result_store_reads_history_and_summary(tmp_path):
     assert summary["runs"][0]["avg_reproj_error_px"] == 15.0
     assert summary["runs"][0]["min_reproj_error_px"] == 12.0
     assert summary["runs"][0]["max_reproj_error_px"] == 18.0
+    assert summary["runs"][0]["avg_elapsed_ms"] == 2000.0
     assert summary["runs"][0]["worst_reproj_frame_set_id"] == 2
     assert summary["runs"][0]["slowest_frame_set_id"] == 2
     assert summary["runs"][0]["max_elapsed_ms"] == 3000.0
