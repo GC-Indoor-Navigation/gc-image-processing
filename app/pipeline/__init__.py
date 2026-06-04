@@ -1,3 +1,4 @@
+from app.pipeline.alerts import AlertEvent, AlertSeverity, AlertSource
 from app.pipeline.input_adapter import (
     CameraFrameInput,
     MotionCaptureInput,
@@ -18,6 +19,9 @@ from app.pipeline.worker import MotionCaptureWorker
 
 
 __all__ = [
+    "AlertEvent",
+    "AlertSeverity",
+    "AlertSource",
     "CameraFrameInput",
     "ExternalMotionCaptureProcessor",
     "ExternalProcessorOutput",

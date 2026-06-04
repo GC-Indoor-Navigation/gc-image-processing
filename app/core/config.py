@@ -38,6 +38,10 @@ class Settings:
     mmpose_extrinsic_convention: str = "world_to_camera"
     mmpose_temp_dir: Path | None = None
     mmpose_preload: bool = False
+    alerts_enabled: bool = False
+    alerts_target_url: str = ""
+    alerts_timeout_sec: float = 1.0
+    alerts_ttl_ms: int = 500
 
 
 def load_settings() -> Settings:
@@ -87,6 +91,10 @@ def load_settings() -> Settings:
         ),
         mmpose_temp_dir=_env_optional_path("PROCESSING_MMPOSE_TEMP_DIR"),
         mmpose_preload=_env_bool("PROCESSING_MMPOSE_PRELOAD", False),
+        alerts_enabled=_env_bool("PROCESSING_ALERTS_ENABLED", False),
+        alerts_target_url=os.getenv("PROCESSING_ALERTS_TARGET_URL", ""),
+        alerts_timeout_sec=float(os.getenv("PROCESSING_ALERTS_TIMEOUT_SEC", "1.0")),
+        alerts_ttl_ms=int(os.getenv("PROCESSING_ALERTS_TTL_MS", "500")),
     )
 
 

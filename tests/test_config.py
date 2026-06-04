@@ -32,6 +32,10 @@ def test_load_settings_reads_project_env_file(tmp_path, monkeypatch):
         "PROCESSING_MMPOSE_EXTRINSIC_CONVENTION",
         "PROCESSING_MMPOSE_TEMP_DIR",
         "PROCESSING_MMPOSE_PRELOAD",
+        "PROCESSING_ALERTS_ENABLED",
+        "PROCESSING_ALERTS_TARGET_URL",
+        "PROCESSING_ALERTS_TIMEOUT_SEC",
+        "PROCESSING_ALERTS_TTL_MS",
     ]:
         monkeypatch.delenv(name, raising=False)
 
@@ -63,6 +67,10 @@ def test_load_settings_reads_project_env_file(tmp_path, monkeypatch):
                 "PROCESSING_MMPOSE_EXTRINSIC_CONVENTION=camera_to_world",
                 "PROCESSING_MMPOSE_TEMP_DIR=tmp/mmpose",
                 "PROCESSING_MMPOSE_PRELOAD=true",
+                "PROCESSING_ALERTS_ENABLED=true",
+                "PROCESSING_ALERTS_TARGET_URL=http://stream/internal/processing-alerts",
+                "PROCESSING_ALERTS_TIMEOUT_SEC=0.25",
+                "PROCESSING_ALERTS_TTL_MS=750",
             ]
         ),
         encoding="utf-8",
@@ -96,4 +104,8 @@ def test_load_settings_reads_project_env_file(tmp_path, monkeypatch):
         mmpose_extrinsic_convention="camera_to_world",
         mmpose_temp_dir=Path("tmp/mmpose"),
         mmpose_preload=True,
+        alerts_enabled=True,
+        alerts_target_url="http://stream/internal/processing-alerts",
+        alerts_timeout_sec=0.25,
+        alerts_ttl_ms=750,
     )
