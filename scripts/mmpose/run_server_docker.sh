@@ -16,6 +16,10 @@ preload="true"
 result_storage="true"
 result_storage_dir="runtime/outputs/mmpose"
 relay_run_idle_reset_sec="5.0"
+alerts_enabled="false"
+alerts_target_url=""
+alerts_timeout_sec="1.0"
+alerts_ttl_ms="500"
 cpu="false"
 no_gpu="false"
 calib_json=""
@@ -48,6 +52,10 @@ Options:
   --no-result-storage                   Disable JSONL result storage
   --result-storage-dir PATH             Result storage dir (default: runtime/outputs/mmpose)
   --relay-run-idle-reset-sec VALUE      Idle seconds before new relay run detection (default: 5.0)
+  --alerts-enabled                      Publish alert events to Stream Server
+  --alerts-target-url URL               Stream Server alert endpoint URL
+  --alerts-timeout-sec VALUE            Alert publish timeout seconds (default: 1.0)
+  --alerts-ttl-ms VALUE                 Alert event TTL milliseconds (default: 500)
   --cpu                                 Run MMPose on CPU and do not pass --gpus all
   --no-gpu                              Do not pass --gpus all but keep selected --device
   -h, --help                            Show this help
@@ -73,6 +81,10 @@ while [[ $# -gt 0 ]]; do
     --no-result-storage) result_storage="false"; shift ;;
     --result-storage-dir) result_storage_dir="$2"; shift 2 ;;
     --relay-run-idle-reset-sec) relay_run_idle_reset_sec="$2"; shift 2 ;;
+    --alerts-enabled) alerts_enabled="true"; shift ;;
+    --alerts-target-url) alerts_target_url="$2"; shift 2 ;;
+    --alerts-timeout-sec) alerts_timeout_sec="$2"; shift 2 ;;
+    --alerts-ttl-ms) alerts_ttl_ms="$2"; shift 2 ;;
     --cpu) cpu="true"; shift ;;
     --no-gpu) no_gpu="true"; shift ;;
     -h|--help) usage; exit 0 ;;
@@ -144,6 +156,10 @@ docker_args=(
   -e PROCESSING_MMPOSE_EXTRINSIC_SOURCE="$extrinsic_source"
   -e PROCESSING_MMPOSE_EXTRINSIC_CONVENTION="$extrinsic_convention"
   -e PROCESSING_MMPOSE_PRELOAD="$preload"
+  -e PROCESSING_ALERTS_ENABLED="$alerts_enabled"
+  -e PROCESSING_ALERTS_TARGET_URL="$alerts_target_url"
+  -e PROCESSING_ALERTS_TIMEOUT_SEC="$alerts_timeout_sec"
+  -e PROCESSING_ALERTS_TTL_MS="$alerts_ttl_ms"
 )
 
 if [[ -n "$temp_dir" ]]; then
@@ -168,6 +184,9 @@ docker_args+=(
   --mmpose-max-reproj-error "$max_reproj_error"
   --mmpose-extrinsic-source "$extrinsic_source"
   --mmpose-extrinsic-convention "$extrinsic_convention"
+  --alerts-target-url "$alerts_target_url"
+  --alerts-timeout-sec "$alerts_timeout_sec"
+  --alerts-ttl-ms "$alerts_ttl_ms"
 )
 
 for mapping in "${camera_mappings[@]}"; do
@@ -180,6 +199,10 @@ fi
 
 if [[ "$preload" == "true" ]]; then
   docker_args+=(--mmpose-preload)
+fi
+
+if [[ "$alerts_enabled" == "true" ]]; then
+  docker_args+=(--alerts-enabled)
 fi
 
 if [[ "$result_storage" == "true" ]]; then
@@ -199,5 +222,7 @@ echo "Device:  $effective_device"
 echo "Mapping: $camera_mapping_csv"
 echo "Preload: $preload"
 echo "Results: $container_result_storage_dir"
+echo "Alerts: $alerts_enabled"
+echo "AlertTarget: $alerts_target_url"
 
 exec docker "${docker_args[@]}"

@@ -20,6 +20,10 @@ param(
     [switch]$NoResultStorage,
     [string]$ResultStorageDir = "runtime/outputs/mmpose",
     [double]$RelayRunIdleResetSec = 5.0,
+    [switch]$AlertsEnabled,
+    [string]$AlertsTargetUrl = "",
+    [double]$AlertsTimeoutSec = 1.0,
+    [int]$AlertsTtlMs = 500,
     [switch]$Cpu,
     [switch]$NoGpu
 )
@@ -68,7 +72,11 @@ $dockerArgs = @(
     "-e", "PROCESSING_MMPOSE_IMAGES_UNDISTORTED=$($ImagesUndistorted.IsPresent.ToString().ToLowerInvariant())",
     "-e", "PROCESSING_MMPOSE_EXTRINSIC_SOURCE=$ExtrinsicSource",
     "-e", "PROCESSING_MMPOSE_EXTRINSIC_CONVENTION=$ExtrinsicConvention",
-    "-e", "PROCESSING_MMPOSE_PRELOAD=$((-not $NoPreload.IsPresent).ToString().ToLowerInvariant())"
+    "-e", "PROCESSING_MMPOSE_PRELOAD=$((-not $NoPreload.IsPresent).ToString().ToLowerInvariant())",
+    "-e", "PROCESSING_ALERTS_ENABLED=$($AlertsEnabled.IsPresent.ToString().ToLowerInvariant())",
+    "-e", "PROCESSING_ALERTS_TARGET_URL=$AlertsTargetUrl",
+    "-e", "PROCESSING_ALERTS_TIMEOUT_SEC=$AlertsTimeoutSec",
+    "-e", "PROCESSING_ALERTS_TTL_MS=$AlertsTtlMs"
 )
 
 if ($TempDir) {
@@ -92,7 +100,10 @@ $dockerArgs += @(
     "--mmpose-kpt-thr", "$KptThr",
     "--mmpose-max-reproj-error", "$MaxReprojError",
     "--mmpose-extrinsic-source", $ExtrinsicSource,
-    "--mmpose-extrinsic-convention", $ExtrinsicConvention
+    "--mmpose-extrinsic-convention", $ExtrinsicConvention,
+    "--alerts-target-url", $AlertsTargetUrl,
+    "--alerts-timeout-sec", "$AlertsTimeoutSec",
+    "--alerts-ttl-ms", "$AlertsTtlMs"
 )
 
 foreach ($mapping in $CameraMapping) {
@@ -105,6 +116,10 @@ if ($ImagesUndistorted) {
 
 if (-not $NoPreload) {
     $dockerArgs += "--mmpose-preload"
+}
+
+if ($AlertsEnabled) {
+    $dockerArgs += "--alerts-enabled"
 }
 
 $containerResultStorageDir = "/workspace/gc-image-processing/$($ResultStorageDir -replace "\\", "/")"
@@ -128,6 +143,8 @@ Write-Host "Device:  $effectiveDevice"
 Write-Host "Mapping: $($CameraMapping -join ',')"
 Write-Host "Preload: $((-not $NoPreload.IsPresent).ToString().ToLowerInvariant())"
 Write-Host "Results: $containerResultStorageDir"
+Write-Host "Alerts: $($AlertsEnabled.IsPresent.ToString().ToLowerInvariant())"
+Write-Host "AlertTarget: $AlertsTargetUrl"
 
 docker @dockerArgs
 if ($LASTEXITCODE -ne 0) {
