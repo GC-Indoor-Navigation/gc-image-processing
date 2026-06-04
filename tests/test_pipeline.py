@@ -9,6 +9,7 @@ from app.infrastructure.relay_contract import (
     RelayFrameSetFrame,
 )
 from app.models.frame import StoredFrame, SynchronizedFrameSet
+from app.pipeline.alerts import AlertEvent, AlertPublisher, AlertSource
 from app.pipeline.external_processor import ExternalMotionCaptureProcessor
 from app.pipeline.input_adapter import MotionCaptureInputAdapter
 from app.pipeline.processor import PlaceholderMotionCaptureProcessor, ProcessingResult
@@ -126,6 +127,146 @@ def test_motion_capture_worker_delegates_to_processor(caplog):
         assert "elapsed_ms=1000.00" in caplog.text
         assert "per_camera_frame_ms=500.000" in caplog.text
         assert "effective_frame_set_fps=1.000" in caplog.text
+    finally:
+        worker.stop()
+
+
+def test_motion_capture_worker_publishes_alert_after_processing():
+    class RecordingEvaluator:
+        def __init__(self):
+            self.received = []
+
+        def evaluate(
+            self,
+            *,
+            processing_result,
+            skeleton_result,
+            ttl_ms,
+            processor_name,
+            camera_devices,
+        ):
+            self.received.append(
+                {
+                    "processing_result": processing_result,
+                    "skeleton_result": skeleton_result,
+                    "ttl_ms": ttl_ms,
+                    "processor_name": processor_name,
+                    "camera_devices": camera_devices,
+                }
+            )
+            return AlertEvent(
+                event_id="alert-2",
+                frame_set_id=processing_result.frame_set_id,
+                relay_run_id=9,
+                timestamp_ms=1234,
+                severity="warning",
+                distance_m=None,
+                joint=None,
+                obstacle_id=None,
+                ttl_ms=ttl_ms,
+                source=AlertSource(
+                    processor=processor_name,
+                    camera_devices=camera_devices,
+                ),
+            )
+
+    sent = []
+    publisher = AlertPublisher(
+        enabled=True,
+        target_url="http://stream/internal/processing-alerts",
+        sender=lambda url, payload, timeout_sec: sent.append(payload),
+    )
+    evaluator = RecordingEvaluator()
+    queue = ProcessingQueue()
+    worker = MotionCaptureWorker(
+        processing_queue=queue,
+        alert_evaluator=evaluator,
+        alert_publisher=publisher,
+        alert_ttl_ms=750,
+    )
+    frame_set = SynchronizedFrameSet(
+        frame_set_id=2,
+        anchor_timestamp_ms=1000,
+        max_delta_ms=0,
+        relay_run_id=9,
+        frames={
+            "camera2": StoredFrame(
+                device_id="camera2",
+                timestamp_ms=1000,
+                sequence=1,
+                content_type="image/jpeg",
+                image_bytes=b"frame-2",
+                image_size=7,
+                source_file_path=None,
+            ),
+            "camera1": StoredFrame(
+                device_id="camera1",
+                timestamp_ms=1000,
+                sequence=1,
+                content_type="image/jpeg",
+                image_bytes=b"frame-1",
+                image_size=7,
+                source_file_path=None,
+            ),
+        },
+    )
+
+    worker.start()
+    try:
+        queue.enqueue(frame_set)
+        for _ in range(100):
+            if publisher.status()["sent_count"] == 1:
+                break
+            sleep(0.01)
+
+        assert worker.status()["processed_count"] == 1
+        assert worker.status()["error_count"] == 0
+        assert evaluator.received[0]["ttl_ms"] == 750
+        assert evaluator.received[0]["processor_name"] == (
+            "PlaceholderMotionCaptureProcessor"
+        )
+        assert evaluator.received[0]["camera_devices"] == ("camera1", "camera2")
+        assert sent[0]["event_id"] == "alert-2"
+        assert sent[0]["ttl_ms"] == 750
+        assert sent[0]["source"]["camera_devices"] == ["camera1", "camera2"]
+    finally:
+        worker.stop()
+
+
+def test_motion_capture_worker_alert_failure_does_not_increment_processing_errors():
+    class FailingEvaluator:
+        def evaluate(self, **kwargs):
+            raise RuntimeError("alert evaluator failed")
+
+    queue = ProcessingQueue()
+    publisher = AlertPublisher(
+        enabled=True,
+        target_url="http://stream/internal/processing-alerts",
+    )
+    worker = MotionCaptureWorker(
+        processing_queue=queue,
+        alert_evaluator=FailingEvaluator(),
+        alert_publisher=publisher,
+    )
+    frame_set = SynchronizedFrameSet(
+        frame_set_id=3,
+        anchor_timestamp_ms=1000,
+        max_delta_ms=0,
+        frames={},
+    )
+
+    worker.start()
+    try:
+        queue.enqueue(frame_set)
+        for _ in range(100):
+            if worker.status()["processed_count"] == 1:
+                break
+            sleep(0.01)
+
+        assert worker.status()["processed_count"] == 1
+        assert worker.status()["error_count"] == 0
+        assert worker.status()["last_result"]["status"] == "placeholder_processed"
+        assert publisher.status()["sent_count"] == 0
     finally:
         worker.stop()
 

@@ -58,12 +58,23 @@ class WorkerStatusResponse(BaseModel):
     last_error: str | None
 
 
+class AlertStatusResponse(BaseModel):
+    enabled: bool
+    target_configured: bool
+    sent_count: int
+    failed_count: int
+    skipped_count: int
+    last_event_id: str | None
+    last_error: str | None
+
+
 class PipelineStatusResponse(BaseModel):
     relay_path: RelayPathStatusResponse
     sync: SyncStatusResponse
     relay_frame_sets: RelayFrameSetStatusResponse
     queue: QueueStatusResponse
     worker: WorkerStatusResponse
+    alerts: AlertStatusResponse
 
 
 class LatestTriangulationResultResponse(BaseModel):

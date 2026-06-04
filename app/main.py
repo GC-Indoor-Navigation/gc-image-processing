@@ -12,6 +12,7 @@ from app.buffers.frame_buffer import FrameBufferManager
 from app.core.config import Settings, load_settings
 from app.infrastructure.debug_dump import DebugFrameDumper
 from app.infrastructure.grpc_receiver import GrpcRelayReceiver
+from app.pipeline.alerts import AlertPublisher, NoOpProximityAlertEvaluator
 from app.pipeline.queue import ProcessingQueue
 from app.pipeline.processor import MotionCaptureProcessor
 from app.pipeline.worker import MotionCaptureWorker
@@ -45,11 +46,19 @@ def create_app(
         if app_settings.result_storage_enabled
         else None
     )
+    alert_publisher = AlertPublisher(
+        enabled=app_settings.alerts_enabled,
+        target_url=app_settings.alerts_target_url,
+        timeout_sec=app_settings.alerts_timeout_sec,
+    )
     motion_capture_worker = (
         MotionCaptureWorker(
             processing_queue=processing_queue,
             processor=motion_capture_processor,
             result_store=result_store,
+            alert_evaluator=NoOpProximityAlertEvaluator(),
+            alert_publisher=alert_publisher,
+            alert_ttl_ms=app_settings.alerts_ttl_ms,
         )
         if app_settings.worker_enabled
         else None
@@ -106,6 +115,7 @@ def create_app(
     fastapi_app.state.motion_capture_worker = motion_capture_worker
     fastapi_app.state.result_store = result_store
     fastapi_app.state.sync_matcher = sync_matcher
+    fastapi_app.state.alert_publisher = alert_publisher
     fastapi_app.include_router(health_router)
     fastapi_app.include_router(status_router)
     fastapi_app.include_router(pipeline_router)
@@ -179,6 +189,10 @@ def parse_args():
     parser.add_argument("--mmpose-extrinsic-convention", default="world_to_camera")
     parser.add_argument("--mmpose-temp-dir", default=None)
     parser.add_argument("--mmpose-preload", action="store_true")
+    parser.add_argument("--alerts-enabled", action="store_true")
+    parser.add_argument("--alerts-target-url", default="")
+    parser.add_argument("--alerts-timeout-sec", type=float, default=1.0)
+    parser.add_argument("--alerts-ttl-ms", type=int, default=500)
     return parser.parse_args()
 
 
@@ -223,6 +237,10 @@ def main():
         mmpose_extrinsic_convention=args.mmpose_extrinsic_convention,
         mmpose_temp_dir=Path(args.mmpose_temp_dir) if args.mmpose_temp_dir else None,
         mmpose_preload=args.mmpose_preload,
+        alerts_enabled=args.alerts_enabled,
+        alerts_target_url=args.alerts_target_url,
+        alerts_timeout_sec=args.alerts_timeout_sec,
+        alerts_ttl_ms=args.alerts_ttl_ms,
     )
     server_app = create_app(settings=settings)
     LOGGER.info(

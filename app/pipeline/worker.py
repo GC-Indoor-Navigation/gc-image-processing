@@ -2,6 +2,11 @@ import logging
 from dataclasses import asdict
 from threading import Event, Thread
 
+from app.pipeline.alerts import (
+    AlertPublisher,
+    NoOpProximityAlertEvaluator,
+    ProximityAlertEvaluator,
+)
 from app.pipeline.input_adapter import MotionCaptureInputAdapter
 from app.pipeline.processor import (
     MotionCaptureProcessor,
@@ -22,11 +27,17 @@ class MotionCaptureWorker:
         processor: MotionCaptureProcessor | None = None,
         input_adapter: MotionCaptureInputAdapter | None = None,
         result_store: JsonlTriangulationResultStore | None = None,
+        alert_evaluator: ProximityAlertEvaluator | None = None,
+        alert_publisher: AlertPublisher | None = None,
+        alert_ttl_ms: int = 500,
     ):
         self.processing_queue = processing_queue
         self.processor = processor or PlaceholderMotionCaptureProcessor()
         self.input_adapter = input_adapter or MotionCaptureInputAdapter()
         self.result_store = result_store
+        self.alert_evaluator = alert_evaluator or NoOpProximityAlertEvaluator()
+        self.alert_publisher = alert_publisher
+        self.alert_ttl_ms = alert_ttl_ms
         self._stop_event = Event()
         self._thread: Thread | None = None
         self.processed_count = 0
@@ -90,6 +101,7 @@ class MotionCaptureWorker:
                             None,
                         ),
                     )
+                self._handle_alerts(frame_set=frame_set, result=result)
                 LOGGER.info(
                     (
                         "processed frame_set_id=%s cameras=%s status=%s "
@@ -112,6 +124,22 @@ class MotionCaptureWorker:
                 LOGGER.exception("motion capture worker failed")
             finally:
                 self.processing_queue.task_done()
+
+    def _handle_alerts(self, *, frame_set, result: ProcessingResult) -> None:
+        if self.alert_publisher is None:
+            return
+        try:
+            alert = self.alert_evaluator.evaluate(
+                processing_result=result,
+                skeleton_result=getattr(self.processor, "last_skeleton_result", None),
+                ttl_ms=self.alert_ttl_ms,
+                processor_name=self.processor.__class__.__name__,
+                camera_devices=tuple(sorted(frame_set.frames)),
+            )
+            if alert is not None:
+                self.alert_publisher.publish(alert)
+        except Exception:
+            LOGGER.exception("alert evaluation failed")
 
 
 def _per_camera_frame_ms(elapsed_ms: float, camera_count: int) -> float | None:

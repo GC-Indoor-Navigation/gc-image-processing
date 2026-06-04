@@ -2,6 +2,7 @@ from fastapi import Request
 
 from app.core.config import Settings
 from app.infrastructure.grpc_receiver import GrpcRelayReceiver
+from app.pipeline.alerts import AlertPublisher
 from app.pipeline.queue import ProcessingQueue
 from app.pipeline.result_store import JsonlTriangulationResultStore
 from app.pipeline.worker import MotionCaptureWorker
@@ -35,3 +36,7 @@ def get_result_store(request: Request) -> JsonlTriangulationResultStore | None:
 
 def get_sync_matcher(request: Request) -> SyncMatcher | None:
     return request.app.state.sync_matcher
+
+
+def get_alert_publisher(request: Request) -> AlertPublisher | None:
+    return request.app.state.alert_publisher

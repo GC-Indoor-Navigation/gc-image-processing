@@ -12,13 +12,16 @@ from app.api.deps import (
     get_result_store,
     get_settings,
     get_sync_matcher,
+    get_alert_publisher,
 )
 from app.core.config import Settings
+from app.pipeline.alerts import AlertPublisher
 from app.pipeline.queue import ProcessingQueue
 from app.pipeline.result_store import JsonlTriangulationResultStore
 from app.pipeline.worker import MotionCaptureWorker
 from app.schemas.pipeline import (
     FrameSetResponse,
+    AlertStatusResponse,
     LatestTriangulationResultResponse,
     PipelineStatusResponse,
     ResultDetailResponse,
@@ -54,6 +57,7 @@ def pipeline_status(
     processing_queue: ProcessingQueue | None = Depends(get_processing_queue),
     worker: MotionCaptureWorker | None = Depends(get_motion_capture_worker),
     sync_matcher: SyncMatcher | None = Depends(get_sync_matcher),
+    alert_publisher: AlertPublisher | None = Depends(get_alert_publisher),
 ):
     sync_status = (
         sync_matcher.status()
@@ -96,6 +100,7 @@ def pipeline_status(
             "enabled": settings.worker_enabled,
             **worker_status,
         },
+        "alerts": _alert_status(alert_publisher),
     }
 
 
@@ -236,3 +241,17 @@ def _serialize_result(value: Any) -> dict[str, Any] | None:
     if isinstance(value, dict):
         return value
     return None
+
+
+def _alert_status(alert_publisher: AlertPublisher | None) -> dict:
+    if alert_publisher is None:
+        return {
+            "enabled": False,
+            "target_configured": False,
+            "sent_count": 0,
+            "failed_count": 0,
+            "skipped_count": 0,
+            "last_event_id": None,
+            "last_error": None,
+        }
+    return alert_publisher.status()

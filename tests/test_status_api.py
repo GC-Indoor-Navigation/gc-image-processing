@@ -167,6 +167,43 @@ def test_pipeline_status_endpoint_returns_queue_and_worker_state():
     assert body["queue"]["queue_size"] == 0
     assert body["worker"]["enabled"] is True
     assert body["worker"]["last_result"] is None
+    assert body["alerts"] == {
+        "enabled": False,
+        "target_configured": False,
+        "sent_count": 0,
+        "failed_count": 0,
+        "skipped_count": 0,
+        "last_event_id": None,
+        "last_error": None,
+    }
+
+
+def test_pipeline_status_endpoint_returns_alert_publisher_state():
+    service = ProcessingService(buffer_manager=FrameBufferManager(buffer_size=120))
+    app = create_app(
+        settings=Settings(
+            grpc_enabled=False,
+            alerts_enabled=True,
+            alerts_target_url="http://stream/internal/processing-alerts",
+        ),
+        service=service,
+    )
+    app.state.alert_publisher.sent_count = 2
+    client = TestClient(app)
+
+    response = client.get("/pipeline/status")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["alerts"] == {
+        "enabled": True,
+        "target_configured": True,
+        "sent_count": 2,
+        "failed_count": 0,
+        "skipped_count": 0,
+        "last_event_id": None,
+        "last_error": None,
+    }
 
 
 def test_latest_pipeline_result_endpoint_returns_empty_state():
