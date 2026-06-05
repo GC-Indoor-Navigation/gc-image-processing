@@ -24,6 +24,15 @@ param(
     [string]$AlertsTargetUrl = "",
     [double]$AlertsTimeoutSec = 1.0,
     [int]$AlertsTtlMs = 500,
+    [string]$AlertsDangerPointsJson = "",
+    [int]$AlertsMinValidJoints = 8,
+    [double]$AlertsMaxReprojErrorPx = 80.0,
+    [double]$AlertsPredictSeconds = 1.0,
+    [double]$AlertsSmoothAlpha = 0.35,
+    [double]$AlertsCooldownSec = 0.0,
+    [string]$AlertsApproachWarningRadiusM = "",
+    [string]$AlertsApproachDangerRadiusM = "",
+    [string]$AlertsCollisionWarningRadiusM = "",
     [switch]$Cpu,
     [switch]$NoGpu
 )
@@ -47,6 +56,7 @@ function Convert-ToContainerPath([string]$PathText) {
 }
 
 $containerCalib = Convert-ToContainerPath $CalibJson
+$containerAlertsDangerPoints = if ($AlertsDangerPointsJson) { Convert-ToContainerPath $AlertsDangerPointsJson } else { "" }
 $effectiveDevice = if ($Cpu) { "cpu" } else { $Device }
 
 $dockerArgs = @(
@@ -76,7 +86,16 @@ $dockerArgs = @(
     "-e", "PROCESSING_ALERTS_ENABLED=$($AlertsEnabled.IsPresent.ToString().ToLowerInvariant())",
     "-e", "PROCESSING_ALERTS_TARGET_URL=$AlertsTargetUrl",
     "-e", "PROCESSING_ALERTS_TIMEOUT_SEC=$AlertsTimeoutSec",
-    "-e", "PROCESSING_ALERTS_TTL_MS=$AlertsTtlMs"
+    "-e", "PROCESSING_ALERTS_TTL_MS=$AlertsTtlMs",
+    "-e", "PROCESSING_ALERTS_DANGER_POINTS_JSON=$containerAlertsDangerPoints",
+    "-e", "PROCESSING_ALERTS_MIN_VALID_JOINTS=$AlertsMinValidJoints",
+    "-e", "PROCESSING_ALERTS_MAX_REPROJ_ERROR_PX=$AlertsMaxReprojErrorPx",
+    "-e", "PROCESSING_ALERTS_PREDICT_SECONDS=$AlertsPredictSeconds",
+    "-e", "PROCESSING_ALERTS_SMOOTH_ALPHA=$AlertsSmoothAlpha",
+    "-e", "PROCESSING_ALERTS_COOLDOWN_SEC=$AlertsCooldownSec",
+    "-e", "PROCESSING_ALERTS_APPROACH_WARNING_RADIUS_M=$AlertsApproachWarningRadiusM",
+    "-e", "PROCESSING_ALERTS_APPROACH_DANGER_RADIUS_M=$AlertsApproachDangerRadiusM",
+    "-e", "PROCESSING_ALERTS_COLLISION_WARNING_RADIUS_M=$AlertsCollisionWarningRadiusM"
 )
 
 if ($TempDir) {
@@ -103,8 +122,29 @@ $dockerArgs += @(
     "--mmpose-extrinsic-convention", $ExtrinsicConvention,
     "--alerts-target-url", $AlertsTargetUrl,
     "--alerts-timeout-sec", "$AlertsTimeoutSec",
-    "--alerts-ttl-ms", "$AlertsTtlMs"
+    "--alerts-ttl-ms", "$AlertsTtlMs",
+    "--alerts-min-valid-joints", "$AlertsMinValidJoints",
+    "--alerts-max-reproj-error-px", "$AlertsMaxReprojErrorPx",
+    "--alerts-predict-seconds", "$AlertsPredictSeconds",
+    "--alerts-smooth-alpha", "$AlertsSmoothAlpha",
+    "--alerts-cooldown-sec", "$AlertsCooldownSec"
 )
+
+if ($containerAlertsDangerPoints) {
+    $dockerArgs += @("--alerts-danger-points-json", $containerAlertsDangerPoints)
+}
+
+if ($AlertsApproachWarningRadiusM) {
+    $dockerArgs += @("--alerts-approach-warning-radius-m", $AlertsApproachWarningRadiusM)
+}
+
+if ($AlertsApproachDangerRadiusM) {
+    $dockerArgs += @("--alerts-approach-danger-radius-m", $AlertsApproachDangerRadiusM)
+}
+
+if ($AlertsCollisionWarningRadiusM) {
+    $dockerArgs += @("--alerts-collision-warning-radius-m", $AlertsCollisionWarningRadiusM)
+}
 
 foreach ($mapping in $CameraMapping) {
     $dockerArgs += @("--mmpose-camera-mapping", $mapping)
@@ -145,6 +185,7 @@ Write-Host "Preload: $((-not $NoPreload.IsPresent).ToString().ToLowerInvariant()
 Write-Host "Results: $containerResultStorageDir"
 Write-Host "Alerts: $($AlertsEnabled.IsPresent.ToString().ToLowerInvariant())"
 Write-Host "AlertTarget: $AlertsTargetUrl"
+Write-Host "AlertDangerPoints: $containerAlertsDangerPoints"
 
 docker @dockerArgs
 if ($LASTEXITCODE -ne 0) {

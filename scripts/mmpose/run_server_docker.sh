@@ -20,6 +20,15 @@ alerts_enabled="false"
 alerts_target_url=""
 alerts_timeout_sec="1.0"
 alerts_ttl_ms="500"
+alerts_danger_points_json=""
+alerts_min_valid_joints="8"
+alerts_max_reproj_error_px="80.0"
+alerts_predict_seconds="1.0"
+alerts_smooth_alpha="0.35"
+alerts_cooldown_sec="0.0"
+alerts_approach_warning_radius_m=""
+alerts_approach_danger_radius_m=""
+alerts_collision_warning_radius_m=""
 cpu="false"
 no_gpu="false"
 calib_json=""
@@ -56,6 +65,15 @@ Options:
   --alerts-target-url URL               Stream Server alert endpoint URL
   --alerts-timeout-sec VALUE            Alert publish timeout seconds (default: 1.0)
   --alerts-ttl-ms VALUE                 Alert event TTL milliseconds (default: 500)
+  --alerts-danger-points-json PATH      Danger points JSON inside this repository
+  --alerts-min-valid-joints VALUE       Min valid 3D joints before alert evaluation (default: 8)
+  --alerts-max-reproj-error-px VALUE    Max avg reprojection error before alert evaluation (default: 80.0)
+  --alerts-predict-seconds VALUE        Seconds to predict approach distance (default: 1.0)
+  --alerts-smooth-alpha VALUE           XY smoothing alpha (default: 0.35)
+  --alerts-cooldown-sec VALUE           Per danger-point/level cooldown seconds (default: 0.0)
+  --alerts-approach-warning-radius-m VALUE
+  --alerts-approach-danger-radius-m VALUE
+  --alerts-collision-warning-radius-m VALUE
   --cpu                                 Run MMPose on CPU and do not pass --gpus all
   --no-gpu                              Do not pass --gpus all but keep selected --device
   -h, --help                            Show this help
@@ -85,6 +103,15 @@ while [[ $# -gt 0 ]]; do
     --alerts-target-url) alerts_target_url="$2"; shift 2 ;;
     --alerts-timeout-sec) alerts_timeout_sec="$2"; shift 2 ;;
     --alerts-ttl-ms) alerts_ttl_ms="$2"; shift 2 ;;
+    --alerts-danger-points-json) alerts_danger_points_json="$2"; shift 2 ;;
+    --alerts-min-valid-joints) alerts_min_valid_joints="$2"; shift 2 ;;
+    --alerts-max-reproj-error-px) alerts_max_reproj_error_px="$2"; shift 2 ;;
+    --alerts-predict-seconds) alerts_predict_seconds="$2"; shift 2 ;;
+    --alerts-smooth-alpha) alerts_smooth_alpha="$2"; shift 2 ;;
+    --alerts-cooldown-sec) alerts_cooldown_sec="$2"; shift 2 ;;
+    --alerts-approach-warning-radius-m) alerts_approach_warning_radius_m="$2"; shift 2 ;;
+    --alerts-approach-danger-radius-m) alerts_approach_danger_radius_m="$2"; shift 2 ;;
+    --alerts-collision-warning-radius-m) alerts_collision_warning_radius_m="$2"; shift 2 ;;
     --cpu) cpu="true"; shift ;;
     --no-gpu) no_gpu="true"; shift ;;
     -h|--help) usage; exit 0 ;;
@@ -124,6 +151,10 @@ to_container_path() {
 }
 
 container_calib="$(to_container_path "$calib_json")"
+container_alerts_danger_points=""
+if [[ -n "$alerts_danger_points_json" ]]; then
+  container_alerts_danger_points="$(to_container_path "$alerts_danger_points_json")"
+fi
 effective_device="$device"
 if [[ "$cpu" == "true" ]]; then
   effective_device="cpu"
@@ -160,6 +191,15 @@ docker_args=(
   -e PROCESSING_ALERTS_TARGET_URL="$alerts_target_url"
   -e PROCESSING_ALERTS_TIMEOUT_SEC="$alerts_timeout_sec"
   -e PROCESSING_ALERTS_TTL_MS="$alerts_ttl_ms"
+  -e PROCESSING_ALERTS_DANGER_POINTS_JSON="$container_alerts_danger_points"
+  -e PROCESSING_ALERTS_MIN_VALID_JOINTS="$alerts_min_valid_joints"
+  -e PROCESSING_ALERTS_MAX_REPROJ_ERROR_PX="$alerts_max_reproj_error_px"
+  -e PROCESSING_ALERTS_PREDICT_SECONDS="$alerts_predict_seconds"
+  -e PROCESSING_ALERTS_SMOOTH_ALPHA="$alerts_smooth_alpha"
+  -e PROCESSING_ALERTS_COOLDOWN_SEC="$alerts_cooldown_sec"
+  -e PROCESSING_ALERTS_APPROACH_WARNING_RADIUS_M="$alerts_approach_warning_radius_m"
+  -e PROCESSING_ALERTS_APPROACH_DANGER_RADIUS_M="$alerts_approach_danger_radius_m"
+  -e PROCESSING_ALERTS_COLLISION_WARNING_RADIUS_M="$alerts_collision_warning_radius_m"
 )
 
 if [[ -n "$temp_dir" ]]; then
@@ -187,7 +227,28 @@ docker_args+=(
   --alerts-target-url "$alerts_target_url"
   --alerts-timeout-sec "$alerts_timeout_sec"
   --alerts-ttl-ms "$alerts_ttl_ms"
+  --alerts-min-valid-joints "$alerts_min_valid_joints"
+  --alerts-max-reproj-error-px "$alerts_max_reproj_error_px"
+  --alerts-predict-seconds "$alerts_predict_seconds"
+  --alerts-smooth-alpha "$alerts_smooth_alpha"
+  --alerts-cooldown-sec "$alerts_cooldown_sec"
 )
+
+if [[ -n "$container_alerts_danger_points" ]]; then
+  docker_args+=(--alerts-danger-points-json "$container_alerts_danger_points")
+fi
+
+if [[ -n "$alerts_approach_warning_radius_m" ]]; then
+  docker_args+=(--alerts-approach-warning-radius-m "$alerts_approach_warning_radius_m")
+fi
+
+if [[ -n "$alerts_approach_danger_radius_m" ]]; then
+  docker_args+=(--alerts-approach-danger-radius-m "$alerts_approach_danger_radius_m")
+fi
+
+if [[ -n "$alerts_collision_warning_radius_m" ]]; then
+  docker_args+=(--alerts-collision-warning-radius-m "$alerts_collision_warning_radius_m")
+fi
 
 for mapping in "${camera_mappings[@]}"; do
   docker_args+=(--mmpose-camera-mapping "$mapping")
@@ -224,5 +285,6 @@ echo "Preload: $preload"
 echo "Results: $container_result_storage_dir"
 echo "Alerts: $alerts_enabled"
 echo "AlertTarget: $alerts_target_url"
+echo "AlertDangerPoints: $container_alerts_danger_points"
 
 exec docker "${docker_args[@]}"

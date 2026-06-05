@@ -21,6 +21,11 @@ from app.pipeline.processor import (
     PlaceholderMotionCaptureProcessor,
     ProcessingResult,
 )
+from app.pipeline.proximity_alerts import (
+    DangerPoint,
+    DangerPointProximityAlertEvaluator,
+    DangerPointProximityConfig,
+)
 from app.pipeline.queue import ProcessingQueue
 from app.pipeline.worker import MotionCaptureWorker
 
@@ -31,6 +36,9 @@ __all__ = [
     "AlertSeverity",
     "AlertSource",
     "CameraFrameInput",
+    "DangerPoint",
+    "DangerPointProximityAlertEvaluator",
+    "DangerPointProximityConfig",
     "ExternalMotionCaptureProcessor",
     "ExternalProcessorOutput",
     "ExternalProcessorRunner",

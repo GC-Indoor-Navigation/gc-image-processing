@@ -12,7 +12,15 @@ from app.buffers.frame_buffer import FrameBufferManager
 from app.core.config import Settings, load_settings
 from app.infrastructure.debug_dump import DebugFrameDumper
 from app.infrastructure.grpc_receiver import GrpcRelayReceiver
-from app.pipeline.alerts import AlertPublisher, NoOpProximityAlertEvaluator
+from app.pipeline.alerts import (
+    AlertPublisher,
+    NoOpProximityAlertEvaluator,
+    ProximityAlertEvaluator,
+)
+from app.pipeline.proximity_alerts import (
+    DangerPointProximityAlertEvaluator,
+    DangerPointProximityConfig,
+)
 from app.pipeline.queue import ProcessingQueue
 from app.pipeline.processor import MotionCaptureProcessor
 from app.pipeline.worker import MotionCaptureWorker
@@ -51,12 +59,13 @@ def create_app(
         target_url=app_settings.alerts_target_url,
         timeout_sec=app_settings.alerts_timeout_sec,
     )
+    alert_evaluator = build_proximity_alert_evaluator(app_settings)
     motion_capture_worker = (
         MotionCaptureWorker(
             processing_queue=processing_queue,
             processor=motion_capture_processor,
             result_store=result_store,
-            alert_evaluator=NoOpProximityAlertEvaluator(),
+            alert_evaluator=alert_evaluator,
             alert_publisher=alert_publisher,
             alert_ttl_ms=app_settings.alerts_ttl_ms,
         )
@@ -160,6 +169,25 @@ def build_motion_capture_processor(settings: Settings) -> MotionCaptureProcessor
     raise ValueError(f"unknown processing processor: {settings.processor}")
 
 
+def build_proximity_alert_evaluator(settings: Settings) -> ProximityAlertEvaluator:
+    if not settings.alerts_enabled or settings.alerts_danger_points_json is None:
+        return NoOpProximityAlertEvaluator()
+
+    return DangerPointProximityAlertEvaluator(
+        DangerPointProximityConfig(
+            danger_points_json=settings.alerts_danger_points_json,
+            predict_seconds=settings.alerts_predict_seconds,
+            smooth_alpha=settings.alerts_smooth_alpha,
+            min_valid_joints=settings.alerts_min_valid_joints,
+            max_avg_reproj_error_px=settings.alerts_max_reproj_error_px,
+            alert_cooldown_sec=settings.alerts_cooldown_sec,
+            approach_warning_radius_m=settings.alerts_approach_warning_radius_m,
+            approach_danger_radius_m=settings.alerts_approach_danger_radius_m,
+            collision_warning_radius_m=settings.alerts_collision_warning_radius_m,
+        )
+    )
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description="GC image processing FastAPI server")
     parser.add_argument("--host", default="127.0.0.1")
@@ -193,6 +221,15 @@ def parse_args():
     parser.add_argument("--alerts-target-url", default="")
     parser.add_argument("--alerts-timeout-sec", type=float, default=1.0)
     parser.add_argument("--alerts-ttl-ms", type=int, default=500)
+    parser.add_argument("--alerts-danger-points-json", default=None)
+    parser.add_argument("--alerts-min-valid-joints", type=int, default=8)
+    parser.add_argument("--alerts-max-reproj-error-px", type=float, default=80.0)
+    parser.add_argument("--alerts-predict-seconds", type=float, default=1.0)
+    parser.add_argument("--alerts-smooth-alpha", type=float, default=0.35)
+    parser.add_argument("--alerts-cooldown-sec", type=float, default=0.0)
+    parser.add_argument("--alerts-approach-warning-radius-m", type=float, default=None)
+    parser.add_argument("--alerts-approach-danger-radius-m", type=float, default=None)
+    parser.add_argument("--alerts-collision-warning-radius-m", type=float, default=None)
     return parser.parse_args()
 
 
@@ -241,6 +278,19 @@ def main():
         alerts_target_url=args.alerts_target_url,
         alerts_timeout_sec=args.alerts_timeout_sec,
         alerts_ttl_ms=args.alerts_ttl_ms,
+        alerts_danger_points_json=(
+            Path(args.alerts_danger_points_json)
+            if args.alerts_danger_points_json
+            else None
+        ),
+        alerts_min_valid_joints=args.alerts_min_valid_joints,
+        alerts_max_reproj_error_px=args.alerts_max_reproj_error_px,
+        alerts_predict_seconds=args.alerts_predict_seconds,
+        alerts_smooth_alpha=args.alerts_smooth_alpha,
+        alerts_cooldown_sec=args.alerts_cooldown_sec,
+        alerts_approach_warning_radius_m=args.alerts_approach_warning_radius_m,
+        alerts_approach_danger_radius_m=args.alerts_approach_danger_radius_m,
+        alerts_collision_warning_radius_m=args.alerts_collision_warning_radius_m,
     )
     server_app = create_app(settings=settings)
     LOGGER.info(

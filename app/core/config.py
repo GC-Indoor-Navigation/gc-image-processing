@@ -42,6 +42,15 @@ class Settings:
     alerts_target_url: str = ""
     alerts_timeout_sec: float = 1.0
     alerts_ttl_ms: int = 500
+    alerts_danger_points_json: Path | None = None
+    alerts_min_valid_joints: int = 8
+    alerts_max_reproj_error_px: float = 80.0
+    alerts_predict_seconds: float = 1.0
+    alerts_smooth_alpha: float = 0.35
+    alerts_cooldown_sec: float = 0.0
+    alerts_approach_warning_radius_m: float | None = None
+    alerts_approach_danger_radius_m: float | None = None
+    alerts_collision_warning_radius_m: float | None = None
 
 
 def load_settings() -> Settings:
@@ -95,6 +104,29 @@ def load_settings() -> Settings:
         alerts_target_url=os.getenv("PROCESSING_ALERTS_TARGET_URL", ""),
         alerts_timeout_sec=float(os.getenv("PROCESSING_ALERTS_TIMEOUT_SEC", "1.0")),
         alerts_ttl_ms=int(os.getenv("PROCESSING_ALERTS_TTL_MS", "500")),
+        alerts_danger_points_json=_env_optional_path(
+            "PROCESSING_ALERTS_DANGER_POINTS_JSON"
+        ),
+        alerts_min_valid_joints=int(
+            os.getenv("PROCESSING_ALERTS_MIN_VALID_JOINTS", "8")
+        ),
+        alerts_max_reproj_error_px=float(
+            os.getenv("PROCESSING_ALERTS_MAX_REPROJ_ERROR_PX", "80.0")
+        ),
+        alerts_predict_seconds=float(
+            os.getenv("PROCESSING_ALERTS_PREDICT_SECONDS", "1.0")
+        ),
+        alerts_smooth_alpha=float(os.getenv("PROCESSING_ALERTS_SMOOTH_ALPHA", "0.35")),
+        alerts_cooldown_sec=float(os.getenv("PROCESSING_ALERTS_COOLDOWN_SEC", "0.0")),
+        alerts_approach_warning_radius_m=_env_optional_float(
+            "PROCESSING_ALERTS_APPROACH_WARNING_RADIUS_M"
+        ),
+        alerts_approach_danger_radius_m=_env_optional_float(
+            "PROCESSING_ALERTS_APPROACH_DANGER_RADIUS_M"
+        ),
+        alerts_collision_warning_radius_m=_env_optional_float(
+            "PROCESSING_ALERTS_COLLISION_WARNING_RADIUS_M"
+        ),
     )
 
 
@@ -119,3 +151,10 @@ def _env_optional_path(name: str) -> Path | None:
     if not raw_value:
         return None
     return Path(raw_value)
+
+
+def _env_optional_float(name: str) -> float | None:
+    raw_value = os.getenv(name, "").strip()
+    if not raw_value:
+        return None
+    return float(raw_value)
