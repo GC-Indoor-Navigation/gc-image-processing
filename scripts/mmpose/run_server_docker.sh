@@ -15,6 +15,7 @@ temp_dir=""
 preload="true"
 result_storage="true"
 result_storage_dir="runtime/outputs/mmpose"
+torch_cache_dir="runtime/model_cache/torch"
 relay_run_idle_reset_sec="5.0"
 alerts_enabled="false"
 alerts_target_url=""
@@ -60,6 +61,7 @@ Options:
   --no-preload                          Disable startup MMPose preload
   --no-result-storage                   Disable JSONL result storage
   --result-storage-dir PATH             Result storage dir (default: runtime/outputs/mmpose)
+  --torch-cache-dir PATH                Persistent torch cache dir (default: runtime/model_cache/torch)
   --relay-run-idle-reset-sec VALUE      Idle seconds before new relay run detection (default: 5.0)
   --alerts-enabled                      Publish alert events to Stream Server
   --alerts-target-url URL               Stream Server alert endpoint URL
@@ -98,6 +100,7 @@ while [[ $# -gt 0 ]]; do
     --no-preload) preload="false"; shift ;;
     --no-result-storage) result_storage="false"; shift ;;
     --result-storage-dir) result_storage_dir="$2"; shift 2 ;;
+    --torch-cache-dir) torch_cache_dir="$2"; shift 2 ;;
     --relay-run-idle-reset-sec) relay_run_idle_reset_sec="$2"; shift 2 ;;
     --alerts-enabled) alerts_enabled="true"; shift ;;
     --alerts-target-url) alerts_target_url="$2"; shift 2 ;;
@@ -162,6 +165,9 @@ fi
 
 camera_mapping_csv="$(IFS=,; echo "${camera_mappings[*]}")"
 container_result_storage_dir="/workspace/gc-image-processing/${result_storage_dir//\\//}"
+torch_cache_host_dir="$repo_root/${torch_cache_dir//\\//}"
+mkdir -p "$torch_cache_host_dir"
+container_torch_cache="/root/.cache/torch"
 
 docker_args=(
   run
@@ -169,6 +175,7 @@ docker_args=(
   -p "$http_port:9000"
   -p "$grpc_port:50051"
   -v "$repo_root:/workspace/gc-image-processing"
+  -v "$torch_cache_host_dir:$container_torch_cache"
   -w /workspace/gc-image-processing
   -e PROCESSING_HTTP_HOST=0.0.0.0
   -e PROCESSING_HTTP_PORT=9000
@@ -187,6 +194,7 @@ docker_args=(
   -e PROCESSING_MMPOSE_EXTRINSIC_SOURCE="$extrinsic_source"
   -e PROCESSING_MMPOSE_EXTRINSIC_CONVENTION="$extrinsic_convention"
   -e PROCESSING_MMPOSE_PRELOAD="$preload"
+  -e TORCH_HOME="$container_torch_cache"
   -e PROCESSING_ALERTS_ENABLED="$alerts_enabled"
   -e PROCESSING_ALERTS_TARGET_URL="$alerts_target_url"
   -e PROCESSING_ALERTS_TIMEOUT_SEC="$alerts_timeout_sec"
@@ -224,7 +232,6 @@ docker_args+=(
   --mmpose-max-reproj-error "$max_reproj_error"
   --mmpose-extrinsic-source "$extrinsic_source"
   --mmpose-extrinsic-convention "$extrinsic_convention"
-  --alerts-target-url "$alerts_target_url"
   --alerts-timeout-sec "$alerts_timeout_sec"
   --alerts-ttl-ms "$alerts_ttl_ms"
   --alerts-min-valid-joints "$alerts_min_valid_joints"
@@ -233,6 +240,10 @@ docker_args+=(
   --alerts-smooth-alpha "$alerts_smooth_alpha"
   --alerts-cooldown-sec "$alerts_cooldown_sec"
 )
+
+if [[ -n "$alerts_target_url" ]]; then
+  docker_args+=(--alerts-target-url "$alerts_target_url")
+fi
 
 if [[ -n "$container_alerts_danger_points" ]]; then
   docker_args+=(--alerts-danger-points-json "$container_alerts_danger_points")
@@ -283,6 +294,7 @@ echo "Device:  $effective_device"
 echo "Mapping: $camera_mapping_csv"
 echo "Preload: $preload"
 echo "Results: $container_result_storage_dir"
+echo "TorchCache: $torch_cache_host_dir -> $container_torch_cache"
 echo "Alerts: $alerts_enabled"
 echo "AlertTarget: $alerts_target_url"
 echo "AlertDangerPoints: $container_alerts_danger_points"

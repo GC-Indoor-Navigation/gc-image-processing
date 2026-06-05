@@ -19,6 +19,7 @@ param(
     [switch]$NoPreload,
     [switch]$NoResultStorage,
     [string]$ResultStorageDir = "runtime/outputs/mmpose",
+    [string]$TorchCacheDir = "runtime/model_cache/torch",
     [double]$RelayRunIdleResetSec = 5.0,
     [switch]$AlertsEnabled,
     [string]$AlertsTargetUrl = "",
@@ -57,6 +58,9 @@ function Convert-ToContainerPath([string]$PathText) {
 
 $containerCalib = Convert-ToContainerPath $CalibJson
 $containerAlertsDangerPoints = if ($AlertsDangerPointsJson) { Convert-ToContainerPath $AlertsDangerPointsJson } else { "" }
+$torchCacheHostPath = Join-Path $repoRoot.Path $TorchCacheDir
+New-Item -ItemType Directory -Force -Path $torchCacheHostPath | Out-Null
+$containerTorchCache = "/root/.cache/torch"
 $effectiveDevice = if ($Cpu) { "cpu" } else { $Device }
 
 $dockerArgs = @(
@@ -65,6 +69,7 @@ $dockerArgs = @(
     "-p", "$($HttpPort):9000",
     "-p", "$($GrpcPort):50051",
     "-v", "$($repoRoot.Path):/workspace/gc-image-processing",
+    "-v", "$($torchCacheHostPath):$containerTorchCache",
     "-w", "/workspace/gc-image-processing",
     "-e", "PROCESSING_HTTP_HOST=0.0.0.0",
     "-e", "PROCESSING_HTTP_PORT=9000",
@@ -83,6 +88,7 @@ $dockerArgs = @(
     "-e", "PROCESSING_MMPOSE_EXTRINSIC_SOURCE=$ExtrinsicSource",
     "-e", "PROCESSING_MMPOSE_EXTRINSIC_CONVENTION=$ExtrinsicConvention",
     "-e", "PROCESSING_MMPOSE_PRELOAD=$((-not $NoPreload.IsPresent).ToString().ToLowerInvariant())",
+    "-e", "TORCH_HOME=$containerTorchCache",
     "-e", "PROCESSING_ALERTS_ENABLED=$($AlertsEnabled.IsPresent.ToString().ToLowerInvariant())",
     "-e", "PROCESSING_ALERTS_TARGET_URL=$AlertsTargetUrl",
     "-e", "PROCESSING_ALERTS_TIMEOUT_SEC=$AlertsTimeoutSec",
@@ -120,7 +126,6 @@ $dockerArgs += @(
     "--mmpose-max-reproj-error", "$MaxReprojError",
     "--mmpose-extrinsic-source", $ExtrinsicSource,
     "--mmpose-extrinsic-convention", $ExtrinsicConvention,
-    "--alerts-target-url", $AlertsTargetUrl,
     "--alerts-timeout-sec", "$AlertsTimeoutSec",
     "--alerts-ttl-ms", "$AlertsTtlMs",
     "--alerts-min-valid-joints", "$AlertsMinValidJoints",
@@ -129,6 +134,10 @@ $dockerArgs += @(
     "--alerts-smooth-alpha", "$AlertsSmoothAlpha",
     "--alerts-cooldown-sec", "$AlertsCooldownSec"
 )
+
+if ($AlertsTargetUrl) {
+    $dockerArgs += @("--alerts-target-url", $AlertsTargetUrl)
+}
 
 if ($containerAlertsDangerPoints) {
     $dockerArgs += @("--alerts-danger-points-json", $containerAlertsDangerPoints)
@@ -183,6 +192,7 @@ Write-Host "Device:  $effectiveDevice"
 Write-Host "Mapping: $($CameraMapping -join ',')"
 Write-Host "Preload: $((-not $NoPreload.IsPresent).ToString().ToLowerInvariant())"
 Write-Host "Results: $containerResultStorageDir"
+Write-Host "TorchCache: $torchCacheHostPath -> $containerTorchCache"
 Write-Host "Alerts: $($AlertsEnabled.IsPresent.ToString().ToLowerInvariant())"
 Write-Host "AlertTarget: $AlertsTargetUrl"
 Write-Host "AlertDangerPoints: $containerAlertsDangerPoints"
