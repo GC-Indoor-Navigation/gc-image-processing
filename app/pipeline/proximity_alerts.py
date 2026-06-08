@@ -1,5 +1,6 @@
 import json
 import math
+import time
 from dataclasses import asdict, dataclass, is_dataclass
 from pathlib import Path
 from typing import Any
@@ -86,8 +87,10 @@ class DangerPointProximityAlertEvaluator:
             return None
 
         frame_set_id = _to_int(tri.get("frame_set_id"), default=-1)
-        timestamp_ms = _to_int(tri.get("anchor_timestamp_ms"), default=0)
-        timestamp_sec = _to_seconds(timestamp_ms)
+        frame_timestamp_ms = _to_int(tri.get("anchor_timestamp_ms"), default=0)
+        frame_timestamp_sec = _to_seconds(frame_timestamp_ms)
+        alert_timestamp_ms = _current_time_ms()
+        alert_timestamp_sec = _to_seconds(alert_timestamp_ms)
         relay_run_id = _to_optional_int(tri.get("relay_run_id"))
         if relay_run_id is None:
             relay_run_id = _to_optional_int(getattr(processing_result, "relay_run_id", None))
@@ -112,7 +115,7 @@ class DangerPointProximityAlertEvaluator:
             return None
 
         smooth_xy = self._smooth_xy(person_xy)
-        velocity_xy = self._update_velocity_xy(smooth_xy, timestamp_sec)
+        velocity_xy = self._update_velocity_xy(smooth_xy, frame_timestamp_sec)
 
         candidates = [
             candidate
@@ -122,8 +125,8 @@ class DangerPointProximityAlertEvaluator:
                     danger=danger,
                     frame_set_id=frame_set_id,
                     relay_run_id=relay_run_id,
-                    timestamp_ms=timestamp_ms,
-                    timestamp_sec=timestamp_sec,
+                    timestamp_ms=alert_timestamp_ms,
+                    timestamp_sec=alert_timestamp_sec,
                     valid_joints=valid_joints,
                     person_xy=smooth_xy,
                     velocity_xy=velocity_xy,
@@ -470,6 +473,10 @@ def _to_seconds(timestamp_ms: int | None) -> float | None:
     if timestamp_ms is None:
         return None
     return float(timestamp_ms) / 1000.0
+
+
+def _current_time_ms() -> int:
+    return int(time.time() * 1000)
 
 
 def _to_alert_severity(level: str):

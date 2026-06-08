@@ -73,6 +73,33 @@ def test_evaluator_returns_collision_danger_for_near_joint(tmp_path):
     )
 
 
+def test_evaluator_uses_current_time_for_alert_timestamp(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        "app.pipeline.proximity_alerts._current_time_ms",
+        lambda: 1780502472361,
+    )
+    evaluator = _evaluator(tmp_path)
+    skeleton = _skeleton_result(
+        anchor_timestamp_ms=1000,
+        joints_world={
+            "left_ankle": {"xyz": [0.1, 0.0, 0.0]},
+            "right_ankle": {"xyz": [0.12, 0.0, 0.0]},
+            **_filler_joints(6, [2.0, 2.0, 2.0]),
+        },
+    )
+
+    alert = evaluator.evaluate(
+        processing_result=SimpleNamespace(frame_set_id=7),
+        skeleton_result=skeleton,
+        ttl_ms=500,
+        processor_name="MMPoseTriangulationProcessor",
+        camera_devices=("android_device_001",),
+    )
+
+    assert alert is not None
+    assert alert.timestamp_ms == 1780502472361
+
+
 def test_evaluator_returns_approach_warning_for_person_xy(tmp_path):
     evaluator = _evaluator(tmp_path)
     skeleton = _skeleton_result(
